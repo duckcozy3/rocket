@@ -51,7 +51,7 @@ async function route(request, env, ctx, url) {
     const { result } = await providerRequest(env, `/api/v1/userinfo?user=${encodeURIComponent(username)}`);
     const data = unwrap(result);
     if (!data.uid) throw httpError(404, "Không tìm thấy tài khoản Locket.");
-    return json({ username: data.username || username, uid: data.uid, full_name: data.full_name || data.fullName || "", avatar: cleanUrl(data.profile_picture_url || data.avatar), gold: { has_gold: data.gold?.has_gold === true, expiry_date: data.gold?.expiry_date || null } });
+    return json({ username: data.username || username, uid: data.uid, full_name: data.full_name || data.fullName || "", avatar: profileAvatarUrl(data), gold: { has_gold: data.gold?.has_gold === true, expiry_date: data.gold?.expiry_date || null } });
   }
   if (env.NODNS_CTV_PORTAL === "true" && pathname.startsWith("/api/ctv/")) return remoteCtvRoute(request, env, pathname);
   if (pathname === "/api/plans" && request.method === "GET") return getPlans(env);
@@ -801,6 +801,16 @@ async function readJson(request) {
 
 function cleanText(value, max) { return String(value || "").trim().replace(/[\u0000-\u001f\u007f]/g, "").slice(0, max); }
 function cleanUrl(value) { const text = cleanText(value, 500); if (!text) return ""; try { const url = new URL(text); return url.protocol === "https:" ? url.href : ""; } catch { return ""; } }
+function profileAvatarUrl(profile) {
+  for (const key of ["profile_picture_url", "profilePictureUrl", "profile_picture", "profilePicture", "avatar_url", "avatarUrl", "avatar", "photo_url", "photoUrl", "photo"]) {
+    const value = profile[key];
+    const url = typeof value === "string" ? value : value && typeof value === "object" ? value.url || value.uri || value.src : "";
+    const cleaned = cleanAvatarUrl(url);
+    if (cleaned) return cleaned;
+  }
+  return "";
+}
+function cleanAvatarUrl(value) { const text = cleanText(value, 2048); if (!text) return ""; try { const url = new URL(text); return url.protocol === "https:" ? url.href : ""; } catch { return ""; } }
 function slugify(value) { return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/đ/g, "d").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 100); }
 function maskUsername(value) { const text = String(value || ""); if (text.length <= 3) return `${text[0] || "u"}***`; return `@${text.slice(0, 2)}${"*".repeat(Math.min(6, text.length - 2))}`; }
 function randomCode(length) { const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; const bytes = crypto.getRandomValues(new Uint8Array(length)); return [...bytes].map((byte) => chars[byte % chars.length]).join(""); }

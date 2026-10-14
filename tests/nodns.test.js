@@ -107,7 +107,25 @@ test("public lookup encodes usernames and strips extra upstream fields", async (
   const data = await response.json();
   assert.equal(data.gold.has_gold, true);
   assert.equal(data.full_name, "Alice");
+  assert.equal(data.avatar, "https://images.example/avatar.jpg");
   assert.equal(data.apiKey, undefined);
+});
+
+test("public lookup extracts profile avatars from common provider fields and long URLs", async (t) => {
+  const longAvatarUrl = `https://images.example/avatar.jpg?token=${"a".repeat(600)}`;
+  let profileAvatar;
+  t.mock.method(globalThis, "fetch", async () => Response.json({ status: "success", uid: "uid-1", username: "alice", ...profileAvatar }));
+  for (const avatar of [
+    { profilePictureUrl: longAvatarUrl },
+    { profile_picture: { url: longAvatarUrl } },
+    { avatar_url: longAvatarUrl },
+    { photo: { uri: longAvatarUrl } },
+  ]) {
+    profileAvatar = avatar;
+    const response = await worker.fetch(new Request(`${site}/api/locket/userinfo?user=alice`), {}, {});
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).avatar, longAvatarUrl);
+  }
 });
 
 test("provider business errors and cross-origin mutations are rejected", async (t) => {
