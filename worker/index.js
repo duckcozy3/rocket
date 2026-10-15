@@ -1,4 +1,5 @@
 import { normalizeUsername } from "../src/username.js";
+import { adminRevenue } from "./admin-revenue.js";
 import { ctvCredits, ctvUnitPrice } from "../src/ctv-pricing.js";
 import { createCtvTopup, readCtvTopup, creditCtvTopup } from "./ctv-topups.js";
 import { ensureCtvCredits, buyCtvCredits } from "./ctv-credit-wallet.js";
@@ -443,14 +444,15 @@ async function adminOverview(request, env) {
   await expirePendingOrders(env);
   const storedKey = env.NODNS_CREDENTIALS_ENABLED === "true" && env.DB ? await env.DB.prepare("SELECT provider FROM provider_credentials WHERE provider = 'nodns'").first() : null;
   const integration = { database: Boolean(env.DB), remote_ctv: env.NODNS_CTV_PORTAL === "true", nodns_key: Boolean(storedKey || env.NODNS_API_KEY), remote_admin: env.NODNS_ADMIN_AUTH === "true" };
-  if (!env.DB) return json({ orders: 0, paid_orders: 0, ctv_users: 0, posts: 0, integration });
-  const [orderStats, ctv, posts] = await Promise.all([
+  if (!env.DB) return json({ orders: 0, paid_orders: 0, ctv_users: 0, posts: 0, revenue: [], integration });
+  const [orderStats, ctv, posts, revenue] = await Promise.all([
     visibleAdminOrdersQuery(env, "COUNT(*) AS count, COALESCE(SUM(CASE WHEN status IN ('paid','completed') THEN 1 ELSE 0 END), 0) AS paid_count"),
     count(env, "SELECT COUNT(*) count FROM ctv_users WHERE active = 1"),
     count(env, "SELECT COUNT(*) count FROM posts WHERE status = 'published'"),
+    adminRevenue(env),
   ]);
   const stats = orderStats.results?.[0] || {};
-  return json({ orders: Number(stats.count || 0), paid_orders: Number(stats.paid_count || 0), ctv_users: ctv, posts, integration });
+  return json({ orders: Number(stats.count || 0), paid_orders: Number(stats.paid_count || 0), ctv_users: ctv, posts, revenue, integration });
 }
 
 async function adminOrders(request, env) {

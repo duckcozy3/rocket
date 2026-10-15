@@ -628,6 +628,11 @@ async function renderAdmin() {
   const dash = document.querySelector("#admin-dashboard");
   dash.hidden = false;
   dash.innerHTML = `<aside class="admin-sidebar">${brand()}<nav><a href="#overview">▦ Bảng điều khiển</a><a href="#orders-admin">▤ Đơn hàng</a><a href="#plans-admin">⌑ Bảng giá</a><a href="#posts">✎ Bài viết</a><a href="#promos">％ Mã giảm giá</a><a href="#settings">⚙ Cấu hình công khai</a><a href="#ctv-admin">♙ Cộng tác viên</a></nav><button id="admin-logout">Đăng xuất</button></aside><div class="admin-main"><div class="admin-top"><div><small>QUẢN TRỊ / Bảng điều khiển</small><h1>Quản lý Locket Gold</h1></div><a class="button button--small" href="/">Xem trang web ↗</a></div><section id="overview" class="metric-grid"><article><span>Tổng đơn hàng</span><strong data-admin-metric="orders">${Number(data.orders || 0)}</strong></article><article><span>Đã thanh toán</span><strong data-admin-metric="paid_orders">${Number(data.paid_orders || 0)}</strong></article><article><span>Cộng tác viên</span><strong data-admin-metric="ctv_users">${Number(data.ctv_users || 0)}</strong></article><article><span>Bài viết</span><strong data-admin-metric="posts">${Number(data.posts || 0)}</strong></article></section>${adminForms()}</div>`;
+  const revenue = document.createElement("div");
+  revenue.className = "admin-panel admin-revenue";
+  revenue.innerHTML = `<h2>Doanh thu</h2><p>Tính từ giá trị đơn đã thanh toán hoặc hoàn tất, sau giảm giá. Thời gian theo giờ Việt Nam; bao gồm đơn đã ẩn khỏi danh sách quản lý.</p><div class="table-wrap"><table><thead><tr><th>Thời gian</th><th>Đơn đã thanh toán</th><th>Doanh thu</th></tr></thead><tbody id="admin-revenue-rows"></tbody></table></div>`;
+  dash.querySelector("#overview").append(revenue);
+  renderAdminRevenue(data.revenue);
   document.querySelector("#admin-logout").addEventListener("click", async () => { await api("/api/admin/logout", { method: "POST" }); location.reload(); });
   const integration = data.integration || {};
   const provider = document.createElement("section");
@@ -697,11 +702,20 @@ function adminForms() {
 }
 
 let adminOverviewLoading = false;
+function renderAdminRevenue(revenue = []) {
+  const target = document.querySelector("#admin-revenue-rows");
+  if (!target) return;
+  target.innerHTML = [["today", "Hôm nay"], ["month", "Tháng này"], ["total", "Tổng cộng"]].map(([period, label]) => {
+    const row = revenue.find((item) => item.period === period);
+    return `<tr><td>${label}</td><td>${Number(row?.orders || 0)}</td><td>${money(Number(row?.amount || 0))}</td></tr>`;
+  }).join("");
+}
 async function loadAdminOverview() {
   if (adminOverviewLoading) return;
   adminOverviewLoading = true;
   try {
     const data = await api("/api/admin/overview");
+    renderAdminRevenue(data.revenue);
     document.querySelectorAll("[data-admin-metric]").forEach((element) => {
       element.textContent = Number(data[element.dataset.adminMetric] || 0);
     });

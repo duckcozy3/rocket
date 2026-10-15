@@ -1,4 +1,5 @@
 /* Admin presentation only. Existing selectors, forms and API handlers stay intact. */
+.admin-main .metric-grid > .admin-revenue { grid-column: 1 / -1; margin-top: 6px; min-width: 0; }
 body[data-page="admin"] {
   --admin-bg: #0b1020;
   --admin-surface: #131c30;
