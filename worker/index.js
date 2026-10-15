@@ -116,6 +116,17 @@ async function route(request, env, ctx, url) {
   if (pathname === "/api/admin/ctv" && request.method === "GET") return adminListCtv(request, env);
   if (pathname === "/api/admin/ctv/prices" && request.method === "POST") return adminCtvPrices(request, env);
   if (pathname === "/api/admin/ctv/balance" && request.method === "POST") return adminUpdateCtvBalance(request, env);
+  const deleteCtv = pathname.match(/^\/api\/admin\/ctv\/(\d+)$/);
+  if (deleteCtv && request.method === "DELETE") {
+    await requireSession(request, env, "admin"); requireDb(env);
+    const id = Number(deleteCtv[1]);
+    if (!Number.isSafeInteger(id) || id < 1) throw httpError(400, "CTV không hợp lệ.");
+    const body = await readJson(request);
+    if (body.confirmed !== true) throw httpError(400, "Cần xác nhận xoá tài khoản CTV.");
+    const result = await env.DB.prepare("UPDATE ctv_users SET active = 0 WHERE id = ? AND active = 1").bind(id).run();
+    if (!result.meta?.changes) throw httpError(404, "Không tìm thấy CTV đang hoạt động.");
+    return json({ message: "Đã xoá CTV khỏi danh sách và vô hiệu hoá đăng nhập. Dữ liệu giao dịch được giữ lại." });
+  }
 
   if (pathname === "/api/ctv/login" && request.method === "POST") return ctvLogin(request, env);
   if (pathname === "/api/ctv/credits/buy" && request.method === "POST") {
@@ -854,6 +865,11 @@ async function requireSession(request, env, role) {
     const cookie = await remoteCookie(request, env, "admin");
     const { result } = await providerRequest(env, "/api/auth/me", { cookie });
     if (result.authenticated === false || unwrap(result).authenticated === false) throw httpError(401, "Phiên quản trị đã hết hạn.");
+  }
+  if (role === "ctv") {
+    requireDb(env);
+    const user = await env.DB.prepare("SELECT id FROM ctv_users WHERE id = ? AND active = 1").bind(Number(payload.sub)).first();
+    if (!user) throw httpError(401, "Tài khoản CTV đã bị vô hiệu hoá.");
   }
   return payload;
 }

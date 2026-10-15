@@ -123,5 +123,24 @@ test("local CTV management creates protected accounts, sets individual prices, d
     const logout = await call("/api/ctv/logout", ctv, {});
     assert.equal(logout.status, 200);
     assert.match(logout.headers.get("Set-Cookie"), /lg_ctv=;.*Max-Age=0/);
+    const remove = (cookie = admin, confirmed = true, origin = site) => worker.fetch(new Request(`${site}/api/admin/ctv/${aliceId}`, {
+      method: "DELETE", headers: { Cookie: cookie, Origin: origin, "Content-Type": "application/json" }, body: JSON.stringify({ confirmed }),
+    }), env, {});
+    assert.equal((await remove("")).status, 401);
+    assert.equal((await remove(ctv)).status, 401);
+    assert.equal((await remove(admin, false)).status, 400);
+    assert.equal((await remove(admin, true, "https://other.example")).status, 403);
+    assert.equal((await remove()).status, 200);
+    assert.equal((await remove()).status, 404);
+    const remaining = await (await call("/api/admin/ctv", admin)).json();
+    assert.equal(remaining.stats.count, 1);
+    assert.equal(remaining.ctv[0].username, "bob");
+    assert.equal((await call("/api/ctv/me", ctv)).status, 401);
+    assert.equal((await call("/api/ctv/orders", ctv)).status, 401);
+    assert.equal((await call("/api/ctv/credits/buy", ctv, { quantity: 10, request_id: "deleted-user-purchase-001" })).status, 401);
+    assert.equal((await call("/api/ctv/login", "", { username: "alice", password: alice.password })).status, 401);
+    assert.equal(sqlite.prepare("SELECT balance FROM ctv_users WHERE id = ?").get(aliceId).balance, 160000);
+    assert.equal(sqlite.prepare("SELECT credits FROM ctv_credits WHERE ctv_id = ?").get(aliceId).credits, 105);
+    assert.equal(sqlite.prepare("SELECT COUNT(*) count FROM orders WHERE ctv_id = ?").get(aliceId).count, 4);
   } finally { sqlite.close(); }
 });

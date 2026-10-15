@@ -396,6 +396,7 @@ h1, h2, h3, p { margin-top: 0; }
 .ctv-admin-forms form { min-width: 0; padding: 22px; border: 1px solid #263449; border-radius: 16px; background: #111c2d; }
 .ctv-admin-forms h2 { font-size: 1.05rem; }
 .ctv-inline-price { min-width: 230px; }
+.admin-panel .ctv-delete-button { color: #ff6d8e; border-color: #8b3350; background: #331728; margin-left: 6px; }
 .ctv-inline-price label { font-size: .75rem; white-space: normal; }
 .ctv-inline-price > div { display: flex; gap: 8px; margin-top: 10px; }
 .ctv-inline-price .form-message { white-space: normal; font-size: .75rem; }

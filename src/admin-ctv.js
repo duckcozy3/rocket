@@ -21,7 +21,7 @@ export function addAdminCtv(dash, api, { escapeHtml: esc, money }) {
       const data = await api("/api/admin/ctv");
       accounts = data.ctv;
       panel.querySelectorAll("[data-ctv-stat]").forEach((node) => { node.textContent = node.dataset.ctvStat === "balance" ? money(data.stats.balance) : Number(data.stats[node.dataset.ctvStat] || 0); });
-      panel.querySelector("#admin-ctv-list").innerHTML = accounts.length ? `<div class="table-wrap"><table><thead><tr><th>STT</th><th>Tài khoản CTV</th><th>Đơn đã bán</th><th>Số dư ví</th><th>Giá 1 lượt</th><th>Thao tác</th></tr></thead><tbody>${accounts.map((user, index) => `<tr><td>${index + 1}</td><td>${esc(user.username)}</td><td>${user.sold_orders}</td><td>${money(user.balance)}</td><td data-ctv-price-cell>${money(user.unit_price)} / lượt</td><td><button type="button" class="button button--small button--outline" data-edit-ctv="${user.id}">Sửa giá 1 lượt</button><button type="button" class="button button--small button--outline" data-wallet-ctv="${user.id}">Số dư</button></td></tr>`).join("")}</tbody></table></div>` : "<p>Chưa có cộng tác viên. Tạo tài khoản đầu tiên bên dưới.</p>";
+      panel.querySelector("#admin-ctv-list").innerHTML = accounts.length ? `<div class="table-wrap"><table><thead><tr><th>STT</th><th>Tài khoản CTV</th><th>Đơn đã bán</th><th>Số dư ví</th><th>Giá 1 lượt</th><th>Thao tác</th></tr></thead><tbody>${accounts.map((user, index) => `<tr><td>${index + 1}</td><td>${esc(user.username)}</td><td>${user.sold_orders}</td><td>${money(user.balance)}</td><td data-ctv-price-cell>${money(user.unit_price)} / lượt</td><td><button type="button" class="button button--small button--outline" data-edit-ctv="${user.id}">Sửa giá 1 lượt</button><button type="button" class="button button--small button--outline" data-wallet-ctv="${user.id}">Số dư</button><button type="button" class="button button--small button--outline ctv-delete-button" data-delete-ctv="${user.id}">Xoá CTV</button></td></tr>`).join("")}</tbody></table></div>` : "<p>Chưa có cộng tác viên. Tạo tài khoản đầu tiên bên dưới.</p>";
       const selected = edit.elements.id.value;
       const selectedWallet = wallet.elements.username.value;
       edit.elements.id.innerHTML = accounts.map((user) => `<option value="${user.id}">${esc(user.username)}</option>`).join("");
@@ -64,6 +64,17 @@ export function addAdminCtv(dash, api, { escapeHtml: esc, money }) {
         });
       }));
       panel.querySelectorAll("[data-wallet-ctv]").forEach((button) => button.addEventListener("click", () => { wallet.elements.username.value = accounts.find((user) => String(user.id) === button.dataset.walletCtv).username; wallet.elements.delta.focus(); wallet.scrollIntoView({ behavior: "smooth", block: "center" }); }));
+      panel.querySelectorAll("[data-delete-ctv]").forEach((button) => button.addEventListener("click", async () => {
+        const account = accounts.find((user) => String(user.id) === button.dataset.deleteCtv);
+        if (!window.confirm(`Xoá CTV ${account.username}? Tài khoản sẽ không thể đăng nhập hoặc giao dịch. Ví ${money(account.balance)}, lượt và lịch sử vẫn được giữ để đối soát.`)) return;
+        button.disabled = true;
+        try {
+          const result = await api(`/api/admin/ctv/${account.id}`, { method: "DELETE", body: JSON.stringify({ confirmed: true }) });
+          await refresh();
+          notice.textContent = result.message;
+          notice.className = "form-message is-success";
+        } catch (error) { notice.textContent = error.message; notice.className = "form-message is-error"; button.disabled = false; }
+      }));
     } catch (error) { notice.textContent = error.message; notice.className = "form-message is-error"; }
     finally { loading = false; }
   };
