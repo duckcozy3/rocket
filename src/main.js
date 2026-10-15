@@ -1,4 +1,5 @@
 import "./styles.css";
+import { orderCreatedLabel, visibleAdminOrder } from "./admin-orders.js";
 import { normalizeUsername, parsePastedUsername } from "./username.js";
 import { DEFAULT_PLANS as fallbackPlans } from "./plans.js";
 import { postPurchaseState, apkInstallationGuide, goldCompletionGuide } from "./post-purchase.js";
@@ -634,7 +635,7 @@ async function loadCtvOrders() {
   try {
     const { orders } = await api("/api/ctv/orders");
     if (document.querySelector("#ctv-dashboard")?.dataset.remote === "true") document.querySelector("#ctv-order-count").textContent = orders.length;
-    target.innerHTML = orders.length ? `<div class="table-wrap"><table><thead><tr><th>Mã</th><th>Tên người dùng</th><th>Gói</th><th>Trạng thái</th></tr></thead><tbody>${orders.map((order) => `<tr><td>${escapeHtml(order.code)}</td><td>${escapeHtml(order.username)}</td><td>${escapeHtml(planNameLabel(order.plan_name))}</td><td><span class="status status--${escapeHtml(order.status)}">${escapeHtml(orderStatusLabel(order.status))}</span></td></tr>`).join("")}</tbody></table></div>` : "<p>Chưa có đơn nào.</p>";
+    target.innerHTML = orders.length ? `<div class="table-wrap"><table><thead><tr><th>Mã</th><th>Thời gian đặt (giờ VN)</th><th>Tên người dùng</th><th>Gói</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${orders.map((order) => `<tr><td>${escapeHtml(order.code)}</td><td>${escapeHtml(orderCreatedLabel(order.created_at))}</td><td>${escapeHtml(order.username)}</td><td>${escapeHtml(planNameLabel(order.plan_name))}</td><td><span class="status status--${escapeHtml(order.status)}">${escapeHtml(orderStatusLabel(order.status))}</span></td><td><button type="button" class="button button--small button--outline" data-delete-order="${escapeHtml(order.code)}">Xoá</button></td></tr>`).join("")}</tbody></table></div>` : "<p>Chưa có đơn nào.</p>";
   } catch (error) { target.innerHTML = `<p>${escapeHtml(error.message)}</p>`; }
 }
 
@@ -706,6 +707,10 @@ async function renderAdmin() {
   navLinks.forEach((link) => link.addEventListener("click", () => activate(link.hash)));
   window.addEventListener("hashchange", () => activate(location.hash));
   activate(location.hash || "#overview");
+  window.clearInterval(window.adminOrdersRefreshTimer);
+  window.adminOrdersRefreshTimer = window.setInterval(() => {
+    if (!document.hidden && !document.querySelector("#orders-admin")?.hidden && !dash.querySelector("[data-delete-order]:disabled")) loadAdminOrders();
+  }, 10000);
   bindAdminForms();
   initPostImages(dash, api);
 }
@@ -719,12 +724,24 @@ function adminForms() {
   <section id="ctv-admin" class="admin-panel"><h2>Tạo tài khoản CTV</h2><form data-admin-endpoint="/api/admin/ctv"><div class="form-row"><label>Tên đăng nhập<input name="username" required></label><label>Mật khẩu ban đầu<input name="password" type="password" minlength="10" required></label></div><label>Số dư ban đầu<input name="initial_balance" type="number" min="0" step="1000" value="0"></label><button class="button" type="submit">Tạo CTV</button><p class="form-message"></p></form><hr><h2>Điều chỉnh số dư</h2><form data-admin-endpoint="/api/admin/ctv/balance"><div class="form-row"><label>Tên đăng nhập CTV<input name="username" required></label><label>Số tiền thay đổi<input name="delta" type="number" step="1000" required placeholder="50000 hoặc -50000"></label></div><button class="button" type="submit">Cập nhật số dư</button><p class="form-message"></p></form></section>`;
 }
 
+let adminOrdersLoading = false;
 async function loadAdminOrders() {
   const target = document.querySelector("#admin-orders");
-  if (!target) return;
+  if (!target || adminOrdersLoading) return;
+  adminOrdersLoading = true;
   try {
-    const { orders } = await api("/api/admin/orders");
-    target.innerHTML = orders.length ? `<div class="table-wrap"><table><thead><tr><th>Mã</th><th>Tên người dùng</th><th>Liên hệ</th><th>Gói</th><th>Số tiền</th><th>Trạng thái</th></tr></thead><tbody>${orders.map((order) => `<tr><td>${escapeHtml(order.code)}</td><td>${escapeHtml(order.username)}</td><td>${escapeHtml(order.contact)}</td><td>${escapeHtml(planNameLabel(order.plan_name))}</td><td>${money(order.amount)}</td><td><span class="status status--${escapeHtml(order.status)}">${escapeHtml(orderStatusLabel(order.status))}</span></td></tr>`).join("")}</tbody></table></div>` : "<p>Chưa có đơn hàng.</p>";
+    const { orders: receivedOrders } = await api("/api/admin/orders");
+    const orders = receivedOrders.filter((order) => visibleAdminOrder(order));
+    target.innerHTML = orders.length ? `<div class="table-wrap"><table><thead><tr><th>Mã</th><th>Thời gian đặt (giờ VN)</th><th>Tên người dùng</th><th>Liên hệ</th><th>Gói</th><th>Số tiền</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${orders.map((order) => `<tr><td>${escapeHtml(order.code)}</td><td>${escapeHtml(orderCreatedLabel(order.created_at))}</td><td>${escapeHtml(order.username)}</td><td>${escapeHtml(order.contact)}</td><td>${escapeHtml(planNameLabel(order.plan_name))}</td><td>${money(order.amount)}</td><td><span class="status status--${escapeHtml(order.status)}">${escapeHtml(orderStatusLabel(order.status))}</span></td><td><button type="button" class="button button--small button--outline" data-delete-order="${escapeHtml(order.code)}">Xoá</button></td></tr>`).join("")}</tbody></table></div>` : "<p>Chưa có đơn hàng.</p>";
+    target.querySelectorAll("[data-delete-order]").forEach((button) => button.addEventListener("click", async () => {
+      const code = button.dataset.deleteOrder;
+      if (!window.confirm(`Xoá đơn ${code} khỏi danh sách quản trị? Lịch sử thanh toán vẫn được lưu để đối soát.`)) return;
+      button.disabled = true;
+      try {
+        await api(`/api/admin/orders/${encodeURIComponent(code)}`, { method: "DELETE" });
+        await loadAdminOrders();
+      } catch (error) { window.alert(error.message); button.disabled = false; }
+    }));
     target.querySelectorAll("tbody tr").forEach((row, index) => {
       if (orders[index]?.gold_revoked_at) {
         const badge = row.querySelector(".status");
@@ -737,6 +754,7 @@ async function loadAdminOrders() {
       }
     });
   } catch (error) { target.innerHTML = `<p>${escapeHtml(error.message)}</p>`; }
+  finally { adminOrdersLoading = false; }
 }
 
 function bindAdminForms() {

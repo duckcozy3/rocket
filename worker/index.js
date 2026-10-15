@@ -85,6 +85,8 @@ async function route(request, env, ctx, url) {
     return json({ account: { username: data.username, remaining: Number(data.remaining || 0), total: Number(data.total || 0), used: Number(data.used || 0), active: data.active === true }, orders: (Array.isArray(rows) ? rows : rows.orders || []).map(providerGoldOrder) });
   }
   if (pathname === "/api/admin/orders" && request.method === "GET") return adminOrders(request, env);
+  const adminOrder = pathname.match(/^\/api\/admin\/orders\/([A-Z0-9]+)$/);
+  if (adminOrder && request.method === "DELETE") return adminDeleteOrder(request, env, adminOrder[1]);
   if (pathname === "/api/admin/images" && request.method === "POST") return uploadPostImage(request, env);
   if (pathname.startsWith("/api/images/") && request.method === "GET") return getPostImage(env, pathname.slice(12));
   if (pathname === "/api/admin/provider/key") return adminProviderKey(request, env);
@@ -399,8 +401,15 @@ async function adminOverview(request, env) {
 async function adminOrders(request, env) {
   await requireSession(request, env, "admin"); requireDb(env);
   await expirePendingOrders(env);
-  const { results } = await env.DB.prepare("SELECT code, username, contact, plan_name, amount, status, expires_at, expired_at, gold_revoked_at, created_at FROM orders ORDER BY created_at DESC LIMIT 100").all();
+  const { results } = await env.DB.prepare("SELECT code, username, contact, plan_name, amount, status, expires_at, expired_at, gold_revoked_at, created_at FROM orders WHERE expired_at IS NULL AND admin_deleted_at IS NULL ORDER BY created_at DESC LIMIT 100").all();
   return json({ orders: results || [] });
+}
+
+async function adminDeleteOrder(request, env, code) {
+  await requireSession(request, env, "admin"); requireDb(env);
+  const result = await env.DB.prepare("UPDATE orders SET admin_deleted_at = CURRENT_TIMESTAMP WHERE code = ? AND admin_deleted_at IS NULL").bind(code).run();
+  if (!result.meta?.changes) throw httpError(404, "Không tìm thấy đơn hàng.");
+  return json({ message: "Đã xoá đơn khỏi danh sách quản trị." });
 }
 
 async function adminProviderKey(request, env) {

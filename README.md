@@ -2,6 +2,17 @@
 
 Website nhiều trang cho `locketgold.info`, gồm giao diện bán gói, tải DNS, hướng dẫn, bài viết, cổng cộng tác viên, quản trị và API chạy trên Cloudflare Workers.
 
+## Quản lý đơn hàng
+
+Danh sách đơn quản trị hiển thị thời gian đặt theo giờ Việt Nam và tự cập nhật mỗi 10 giây khi đang mở. Đơn hết hạn thanh toán tự ẩn. Nút **Xoá** yêu cầu xác nhận và chỉ xoá đơn khỏi danh sách quản trị; dữ liệu đơn và lịch sử thanh toán vẫn được giữ để đối soát. Thao tác này không huỷ quyền Gold hoặc hoàn tiền.
+
+Trước khi triển khai phiên bản có chức năng xoá đơn, áp dụng migration `0011_admin_order_deletion.sql`:
+
+```powershell
+npx wrangler d1 migrations apply locketgold-db --remote
+npm run deploy
+```
+
 ## Chạy local
 
 Kho bài viết được nhập với quyền sử dụng do chủ website xác nhận từ `https://locketgold.app/bai-viet`: 2.499 bài, lưu riêng tại `public/imported-posts/` và ảnh tại `public/images/imported-posts/`. Trang bài viết ghép kho này với các bài được đăng qua quản trị và phân trang 20 bài/trang. Nội dung giữ tiêu đề, ngày đăng, phần giới thiệu và các đoạn, danh sách, định dạng của trang nguồn; mã thực thi của trang nguồn không được nhập.
