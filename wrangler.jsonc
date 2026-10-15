@@ -22,7 +22,8 @@
     "ADMIN_CREDENTIALS_ENABLED": "true",
     "BANK_NAME": "MB Bank",
     "BANK_BIN": "970422",
-    "BANK_ACCOUNT": "5565662518"
+    "BANK_ACCOUNT": "5565662518",
+    "BANK_ACCOUNT_NAME": "HO DANG ANH DUC"
   },
   "assets": {
     "directory": "./dist",
