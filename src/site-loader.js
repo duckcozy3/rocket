@@ -17,18 +17,12 @@ export function initSiteLoader(page) {
   let resolveReady;
   const ready = new Promise((resolve) => { resolveReady = resolve; });
   let closed = false;
-  let current = 0;
-  let velocity = 0;
-  let previousTime = started;
+  const duration = 3000;
   let lastValue = -1;
   let done = false;
   let frame;
   let finalTimer;
   const controller = new AbortController();
-  const images = [...document.images].filter((img) => !overlay.contains(img) && img.loading !== "lazy");
-  let loadedImages = images.filter((img) => img.complete).length;
-  let fontsReady = !document.fonts;
-  let windowReady = document.readyState === "complete";
   const close = () => {
     if (closed) return;
     closed = true; cancelAnimationFrame(frame); clearTimeout(timeout); clearTimeout(finalTimer); controller.abort();
@@ -39,30 +33,12 @@ export function initSiteLoader(page) {
     if (focused) document.activeElement.blur();
     setTimeout(() => { overlay.remove(); resolveReady(); }, 160);
   };
-  const timeout = setTimeout(close, 1800);
+  const timeout = setTimeout(close, duration + 500);
   overlay.querySelector("button").addEventListener("click", close, { signal: controller.signal });
-  for (const img of images.filter((image) => !image.complete)) {
-    let counted = false;
-    const ready = () => { if (!counted) { counted = true; loadedImages++; } };
-    img.addEventListener("load", ready, { once: true, signal: controller.signal });
-    img.addEventListener("error", ready, { once: true, signal: controller.signal });
-    if (img.complete) ready();
-  }
-  window.addEventListener("load", () => { windowReady = true; }, { once: true, signal: controller.signal });
-  document.fonts?.ready.then(() => { fontsReady = true; }).catch(() => { fontsReady = true; });
   const tick = (now) => {
     if (closed) return;
-    const ready = (loadedImages >= images.length && fontsReady && windowReady) || now - started >= 1150;
-    const target = ready ? 100 : Math.min(94, 15 + (images.length ? loadedImages / images.length : 1) * 65 + (fontsReady ? 10 : 0) + (windowReady ? 10 : 0));
-    // Critically damped motion keeps velocity continuous across asset updates.
-    const dt = Math.max(0, now - previousTime) / 1000;
-    previousTime = now;
-    const distance = current - target;
-    const spring = velocity + 18 * distance;
-    const decay = Math.exp(-18 * dt);
-    current = Math.min(target, target + (distance + spring * dt) * decay);
-    velocity = (velocity - 18 * spring * dt) * decay;
-    if (ready && current >= 99.9) { current = 100; velocity = 0; }
+    // Start from zero on every page load, including reloads with cached assets.
+    const current = Math.min(100, Math.max(0, (now - started) / duration) * 100);
     const value = Math.floor(current);
     overlay.style.setProperty("--loader-progress", String(current / 100));
     if (value !== lastValue) {
@@ -70,7 +46,7 @@ export function initSiteLoader(page) {
       percent.textContent = `${value}%`; bar.setAttribute("aria-valuenow", String(value));
       message.textContent = value >= 85 ? "Đang hoàn tất chuẩn bị…" : "Đang chuẩn bị trang web…";
     }
-    if (value === 100 && now - started > 350 && !done) {
+    if (value === 100 && !done) {
       done = true; message.textContent = "Sẵn sàng! Chào mừng bạn ♡";
       finalTimer = setTimeout(close, 80);
     }
