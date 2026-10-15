@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import worker from "../worker/index.js";
 import { grantPayload, providerRequest, remoteLogin, remoteCookie, publicCtv, portalOrders } from "../worker/nodns.js";
 
@@ -126,6 +127,32 @@ test("public lookup extracts profile avatars from common provider fields and lon
     assert.equal(response.status, 200);
     assert.equal((await response.json()).avatar, longAvatarUrl);
   }
+});
+
+test("checkout CSP allows the Firebase and Locket CDN avatars returned by public lookup", async (t) => {
+  const headers = readFileSync(new URL("../public/_headers", import.meta.url), "utf8");
+  const imageSources = headers.match(/img-src\s+([^;]+)/)[1].split(/\s+/);
+  let avatar;
+  t.mock.method(globalThis, "fetch", async () => Response.json({
+    uid: "uid-1", username: "alice", profile_picture_url: avatar,
+  }));
+  for (const origin of ["https://firebasestorage.googleapis.com", "https://cdn2.locketcamera.com"]) {
+    avatar = `${origin}/v0/b/locket-img/o/users%2Fuid-1%2Fpublic%2Fprofile_pic.webp?alt=media&token=test-token`;
+    const response = await worker.fetch(new Request(`${site}/api/locket/userinfo?user=alice`), {}, {});
+    assert.equal(response.status, 200);
+    const profile = await response.json();
+    assert.equal(profile.avatar, avatar);
+    assert.ok(imageSources.includes(new URL(profile.avatar).origin), `Checkout CSP must allow ${origin}`);
+  }
+});
+
+test("public lookup allows accounts without an avatar to use the checkout placeholder", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => Response.json({
+    uid: "uid-1", username: "alice", profile_picture_url: null,
+  }));
+  const response = await worker.fetch(new Request(`${site}/api/locket/userinfo?user=alice`), {}, {});
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).avatar, "");
 });
 
 test("provider business errors and cross-origin mutations are rejected", async (t) => {
