@@ -705,12 +705,11 @@ let adminOverviewLoading = false;
 function renderAdminRevenue(revenue = []) {
   const target = document.querySelector("#admin-revenue-rows");
   if (!target) return;
-  const currentMonth = new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", month: "2-digit", year: "numeric" }).format(new Date());
   const months = revenue.filter((row) => /^month:\d{4}-\d{2}$/.test(row.period)).sort((a, b) => b.period.localeCompare(a.period));
-  target.innerHTML = [["today", "Hôm nay"], ["month", `Tháng ${currentMonth} (hiện tại)`], ["total", "Tổng cộng"], ...months.map((row) => {
+  target.innerHTML = [["today", "Hôm nay"], ...months.map((row) => {
     const [year, month] = row.period.slice(6).split("-");
     return [row.period, `Tháng ${month}/${year}`];
-  })].map(([period, label]) => {
+  }), ["total", "Tổng cộng"]].map(([period, label]) => {
     const row = revenue.find((item) => item.period === period);
     return `<tr><td>${label}</td><td>${Number(row?.orders || 0)}</td><td>${money(Number(row?.amount || 0))}</td></tr>`;
   }).join("");
