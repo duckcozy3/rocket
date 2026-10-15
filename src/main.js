@@ -187,11 +187,11 @@ async function loadPosts() {
 }
 
 async function loadDownloads() {
-  enableDownload("#dns-download", defaultDnsUrl, "Mở hướng dẫn cài DNS ↗");
+  enableDownload("#dns-download", defaultDnsUrl, "Tải DNS");
   document.querySelector("#dns-url")?.replaceChildren(defaultDnsUrl);
   try {
     const config = await api("/api/public-config");
-    if (config.dns_url) enableDownload("#dns-download", config.dns_url, "Mở hướng dẫn cài DNS ↗");
+    if (config.dns_url) enableDownload("#dns-download", config.dns_url, "Tải DNS");
     if (config.dns_url && document.querySelector("#dns-url")) document.querySelector("#dns-url").textContent = config.dns_url;
     const contact = document.querySelector("#contact-links");
     if (contact) {
