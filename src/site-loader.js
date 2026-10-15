@@ -36,9 +36,9 @@ export function initSiteLoader(page) {
     const focused = overlay.contains(document.activeElement);
     overlay.classList.add("is-finished");
     if (focused) document.activeElement.blur();
-    setTimeout(() => { overlay.remove(); resolveReady(); }, 320);
+    setTimeout(() => { overlay.remove(); resolveReady(); }, 160);
   };
-  const timeout = setTimeout(close, 4500);
+  const timeout = setTimeout(close, 1800);
   overlay.querySelector("button").addEventListener("click", close, { signal: controller.signal });
   for (const img of images.filter((image) => !image.complete)) {
     let counted = false;
@@ -53,14 +53,14 @@ export function initSiteLoader(page) {
     if (closed) return;
     const ready = loadedImages >= images.length && fontsReady && windowReady;
     const target = ready ? 100 : Math.min(94, 15 + (images.length ? loadedImages / images.length : 1) * 65 + (fontsReady ? 10 : 0) + (windowReady ? 10 : 0));
-    current = Math.min(target, current + Math.max(.2, (target - current) * .065));
+    current = Math.min(target, current + Math.max(.5, (target - current) * .16));
     const value = current > 99.5 ? 100 : Math.floor(current);
     overlay.style.setProperty("--loader-progress", `${current}%`);
     percent.textContent = `${value}%`; bar.setAttribute("aria-valuenow", String(value));
     message.textContent = value >= 85 ? "Đang hoàn tất chuẩn bị…" : "Đang chuẩn bị trang web…";
-    if (value === 100 && performance.now() - started > 1000 && !done) {
+    if (value === 100 && performance.now() - started > 350 && !done) {
       done = true; message.textContent = "Sẵn sàng! Chào mừng bạn ♡";
-      finalTimer = setTimeout(close, 240);
+      finalTimer = setTimeout(close, 80);
     }
     frame = requestAnimationFrame(tick);
   };

@@ -1,4 +1,4 @@
-.site-loader { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; overflow: hidden; background: radial-gradient(ellipse at 50% 44%, #ffe3ed 0, #fff5f9 40%, #fffafd 70%, #fff 100%); color: #6a4159; opacity: 1; transition: opacity .3s ease, visibility .3s ease; }
+.site-loader { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; overflow: hidden; background: radial-gradient(ellipse at 50% 44%, #ffe3ed 0, #fff5f9 40%, #fffafd 70%, #fff 100%); color: #6a4159; opacity: 1; transition: opacity .15s ease, visibility .15s ease; }
 .site-loader[hidden] { display: none; }
 .site-loader.is-finished { opacity: 0; visibility: hidden; pointer-events: none; }
 body.site-is-loading { overflow: hidden; }
