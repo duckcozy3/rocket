@@ -31,6 +31,13 @@ export async function mountCtvPortal(root, user, remote, helpers) {
   const updateAccount = (account) => {
     root.querySelectorAll("[data-ctv-balance]").forEach((el) => { el.textContent = money(account.balance); });
     root.querySelectorAll("[data-ctv-quota]").forEach((el) => { el.textContent = Number(remote ? account.remaining || 0 : account.order_count || 0); });
+    if (!remote && account.plans) {
+      root.querySelectorAll('[name="plan_id"]').forEach((radio) => {
+        const plan = account.plans.find((item) => item.id === radio.value);
+        radio.disabled = !plan;
+        if (plan) radio.closest("label").querySelector("small").textContent = money(plan.price);
+      });
+    }
   };
   const isCompleted = (order) => ["completed", "success", "active"].includes(order.status);
   const statusLabel = (order) => remote && order.status === "pending" ? "Chờ kích hoạt" : order.status === "active" ? "Đang hoạt động" : orderStatusLabel(order.status);

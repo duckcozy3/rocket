@@ -104,6 +104,8 @@ async function route(request, env, ctx, url) {
   if (pathname === "/api/admin/plans" && request.method === "POST") return adminSavePlan(request, env);
   if (pathname === "/api/admin/settings" && request.method === "POST") return adminSaveSettings(request, env);
   if (pathname === "/api/admin/ctv" && request.method === "POST") return adminCreateCtv(request, env);
+  if (pathname === "/api/admin/ctv" && request.method === "GET") return adminListCtv(request, env);
+  if (pathname === "/api/admin/ctv/prices" && request.method === "POST") return adminCtvPrices(request, env);
   if (pathname === "/api/admin/ctv/balance" && request.method === "POST") return adminUpdateCtvBalance(request, env);
 
   if (pathname === "/api/ctv/login" && request.method === "POST") return ctvLogin(request, env);
@@ -619,15 +621,69 @@ async function adminSaveSettings(request, env) {
 async function adminCreateCtv(request, env) {
   await requireSession(request, env, "admin"); requireDb(env);
   const body = await readJson(request);
-  const username = cleanText(body.username, 50).toLowerCase().replace(/[^a-z0-9_.-]/g, "");
+  const username = String(body.username || "").trim().toLowerCase();
   const password = String(body.password || "");
   const initialBalance = Number(body.initial_balance || 0);
-  if (username.length < 3 || password.length < 10) throw httpError(400, "Tên đăng nhập hoặc mật khẩu chưa đạt yêu cầu.");
+  if (!/^[a-z0-9_.-]{3,50}$/.test(username) || password.length < 10 || password.length > 1000) throw httpError(400, "Tên đăng nhập cần 3–50 ký tự chữ, số, dấu chấm, gạch dưới hoặc gạch ngang; mật khẩu cần 10–1000 ký tự.");
   if (!Number.isSafeInteger(initialBalance) || initialBalance < 0 || initialBalance > 1_000_000_000) throw httpError(400, "Số dư ban đầu không hợp lệ.");
+  const prices = validateCtvPrices(body.prices || {});
+  if (await env.DB.prepare("SELECT id FROM ctv_users WHERE username = ? COLLATE NOCASE").bind(username).first()) throw httpError(409, "Tên tài khoản CTV đã tồn tại.");
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const passwordHash = await pbkdf2(password, salt);
-  await env.DB.prepare("INSERT INTO ctv_users (username, password_hash, password_salt, balance, active) VALUES (?, ?, ?, ?, 1)").bind(username, passwordHash, toBase64Url(salt), initialBalance).run();
+  try {
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO ctv_users (username, password_hash, password_salt, balance, active) VALUES (?, ?, ?, ?, 1)").bind(username, passwordHash, toBase64Url(salt), initialBalance),
+      env.DB.prepare("INSERT INTO settings (key, value) SELECT 'ctv_prices:' || id, ? FROM ctv_users WHERE username = ? COLLATE NOCASE").bind(JSON.stringify(prices), username),
+    ]);
+  } catch (error) {
+    if (/UNIQUE constraint failed:\s*ctv_users.username/i.test(String(error.message))) throw httpError(409, "Tên tài khoản CTV đã tồn tại.");
+    throw error;
+  }
   return json({ message: "Đã tạo tài khoản CTV." }, 201);
+}
+
+function validateCtvPrices(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw httpError(400, "Bảng giá CTV không hợp lệ.");
+  const prices = {};
+  for (const [id, raw] of Object.entries(value)) {
+    if (!DEFAULT_PLANS.some((plan) => plan.id === id)) throw httpError(400, "Gói CTV không hợp lệ.");
+    if (raw === "" || raw === null) continue;
+    if (!["number", "string"].includes(typeof raw) || String(raw).trim() === "") throw httpError(400, "Giá CTV không hợp lệ.");
+    const price = Number(raw);
+    if (!Number.isSafeInteger(price) || price < 0 || price > 100_000_000) throw httpError(400, "Giá CTV phải từ 0 đến 100.000.000đ.");
+    prices[id] = price;
+  }
+  return prices;
+}
+
+async function ctvPrices(env, id) {
+  const row = await env.DB.prepare("SELECT value FROM settings WHERE key = ?").bind(`ctv_prices:${id}`).first();
+  if (!row) return {};
+  return validateCtvPrices(JSON.parse(row.value));
+}
+
+async function adminListCtv(request, env) {
+  await requireSession(request, env, "admin"); requireDb(env);
+  const [{ results: users }, { results: stored }, plansResponse] = await Promise.all([
+    env.DB.prepare("SELECT c.id, c.username, c.balance, c.created_at, (SELECT COUNT(*) FROM orders o WHERE o.ctv_id = c.id AND o.status IN ('paid','completed')) AS sold_orders FROM ctv_users c WHERE c.active = 1 ORDER BY c.id").all(),
+    env.DB.prepare("SELECT key, value FROM settings WHERE key LIKE 'ctv_prices:%'").all(),
+    getPlans(env),
+  ]);
+  const { plans } = await plansResponse.json();
+  const prices = new Map((stored || []).map((row) => [row.key, validateCtvPrices(JSON.parse(row.value))]));
+  const ctv = (users || []).map((user) => ({ ...user, balance: Number(user.balance), sold_orders: Number(user.sold_orders), prices: prices.get(`ctv_prices:${user.id}`) || {} }));
+  return json({ ctv, plans, stats: { count: ctv.length, sold_orders: ctv.reduce((total, user) => total + user.sold_orders, 0), balance: ctv.reduce((total, user) => total + user.balance, 0) } });
+}
+
+async function adminCtvPrices(request, env) {
+  await requireSession(request, env, "admin"); requireDb(env);
+  const body = await readJson(request);
+  const id = Number(body.id);
+  if (!Number.isSafeInteger(id) || id < 1) throw httpError(400, "CTV không hợp lệ.");
+  const prices = validateCtvPrices(body.prices);
+  if (!await env.DB.prepare("SELECT id FROM ctv_users WHERE id = ? AND active = 1").bind(id).first()) throw httpError(404, "Không tìm thấy CTV.");
+  await env.DB.prepare("INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP").bind(`ctv_prices:${id}`, JSON.stringify(prices)).run();
+  return json({ message: "Đã lưu giá riêng cho CTV. Các đơn đã tạo giữ nguyên số tiền." });
 }
 
 async function adminUpdateCtvBalance(request, env) {
@@ -673,10 +729,13 @@ async function ctvCreateOrder(request, env, ctx) {
   const session = await requireSession(request, env, "ctv");
   const body = await readJson(request);
   const username = normalizeUsername(body.username);
-  const plan = await findPlan(env, body.plan_id);
-  if (!username || !plan) throw httpError(400, "Tên người dùng hoặc gói chưa hợp lệ.");
+  const originalPlan = await findPlan(env, body.plan_id);
+  if (!username || !originalPlan) throw httpError(400, "Tên người dùng hoặc gói chưa hợp lệ.");
+  const plan = { ...originalPlan };
   const user = await env.DB.prepare("SELECT id, username, balance FROM ctv_users WHERE id = ? AND active = 1").bind(Number(session.sub)).first();
   if (!user) throw httpError(401, "Tài khoản không còn hoạt động.");
+  const prices = await ctvPrices(env, user.id);
+  plan.price = prices[plan.id] ?? plan.price;
   if (Number(user.balance) < Number(plan.price)) throw httpError(400, "Số dư CTV không đủ để tạo đơn.");
   const code = `LG${randomCode(8)}`;
   const insert = env.DB.prepare("INSERT INTO orders (code, username, contact, plan_id, plan_name, platform, subtotal, discount_amount, amount, ctv_id, status, paid_at) SELECT ?, ?, ?, ?, ?, ?, ?, 0, ?, id, 'paid', CURRENT_TIMESTAMP FROM ctv_users WHERE id = ? AND active = 1 AND balance >= ?")
@@ -690,7 +749,9 @@ async function ctvCreateOrder(request, env, ctx) {
 
 async function ctvPublicUser(env, user) {
   const totals = await env.DB.prepare("SELECT COUNT(*) order_count, SUM(CASE WHEN status IN ('paid','completed') THEN 1 ELSE 0 END) completed_count FROM orders WHERE ctv_id = ?").bind(user.id).first();
-  return { username: user.username, balance: Number(user.balance || 0), order_count: Number(totals?.order_count || 0), completed_count: Number(totals?.completed_count || 0) };
+  const prices = await ctvPrices(env, user.id);
+  const { plans } = await (await getPlans(env)).json();
+  return { username: user.username, balance: Number(user.balance || 0), order_count: Number(totals?.order_count || 0), completed_count: Number(totals?.completed_count || 0), plans: plans.map((plan) => ({ ...plan, price: prices[plan.id] ?? plan.price })) };
 }
 
 async function findPlan(env, id) {

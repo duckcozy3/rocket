@@ -1,4 +1,5 @@
 import "./styles.css";
+import { addAdminCtv } from "./admin-ctv.js";
 import "./ctv-portal.css";
 import { mountCtvPortal } from "./ctv-portal.js";
 import { orderCreatedLabel, visibleAdminOrder } from "./admin-orders.js";
@@ -591,7 +592,7 @@ async function renderCtv(user, remote = false) {
   const dashboard = document.querySelector("#ctv-dashboard");
   dashboard.hidden = false;
   dashboard.className = "ctvp";
-  await mountCtvPortal(dashboard, user, remote, { api, escapeHtml, money, plans: fallbackPlans, orderStatusLabel, planNameLabel });
+  await mountCtvPortal(dashboard, user, remote, { api, escapeHtml, money, plans: user.plans || fallbackPlans, orderStatusLabel, planNameLabel });
 }
 
 function initAdmin() {
@@ -630,9 +631,7 @@ async function renderAdmin() {
   providerLink.href = "#provider-admin";
   providerLink.textContent = "⇄ API NoDNS";
   dash.querySelector(".admin-sidebar nav").append(providerLink);
-  if (integration.remote_ctv) {
-    dash.querySelector("#ctv-admin").innerHTML = '<h2>Tài khoản CTV NoDNS</h2><p>Cổng CTV sử dụng tài khoản, số dư và lượt trên NoDNS. Tài liệu hiện có chưa cung cấp chức năng quản trị để tạo tài khoản hoặc điều chỉnh số dư CTV.</p><a class="button button--outline" href="https://ctv.nodns.vn" target="_blank" rel="noopener">Mở hệ thống NoDNS ↗</a>';
-  }
+  addAdminCtv(dash, api, { escapeHtml, money });
   document.querySelector("#provider-refresh").addEventListener("click", async (event) => {
     const button = event.currentTarget;
     if (button.disabled) return;
@@ -658,6 +657,7 @@ async function renderAdmin() {
     });
     if (selected.id === "orders-admin") loadAdminOrders();
     if (selected.id === "overview") loadAdminOverview();
+    if (selected.id === "ctv-admin") selected.dispatchEvent(new Event("ctv-refresh"));
     if (selected.id === "promos") selected.dispatchEvent(new Event("promos-refresh"));
   };
   navLinks.forEach((link) => link.addEventListener("click", () => activate(link.hash)));

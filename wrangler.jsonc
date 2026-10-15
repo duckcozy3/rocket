@@ -15,7 +15,7 @@
   "vars": {
     "SITE_URL": "https://locketgold.info",
     "NODNS_API_BASE_URL": "https://ctv.nodns.vn",
-    "NODNS_CTV_PORTAL": "true",
+    "NODNS_CTV_PORTAL": "false",
     "NODNS_ADMIN_AUTH": "false",
     "NODNS_CREDENTIALS_ENABLED": "true",
     "ADMIN_USERNAME": "admin",

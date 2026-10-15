@@ -17,7 +17,7 @@ npm run deploy
 
 ## Chạy local
 
-Trang `/cong-tac-vien/` sử dụng giao diện Portal CTV tối sau khi đăng nhập: sidebar, số dư/lượt, tra cứu hồ sơ, chọn gói, cấp Gold và tìm kiếm lịch sử. Các mục nạp tiền, mua lượt, quản lý Gold và API dẫn đến cổng NoDNS; tài khoản nội bộ dùng liên hệ hỗ trợ để nạp số dư. Không có API thu hồi Gold CTV hoặc thay đổi TestFlight được tích hợp trong phiên bản này.
+Trang `/cong-tac-vien/` sử dụng tài khoản và ví nội bộ trên locketgold.info. Admin quản lý CTV tại `#ctv-admin`: thống kê số tài khoản đang hoạt động, số đơn đã thanh toán/hoàn tất và tổng số dư ví; tạo tài khoản, điều chỉnh số dư và đặt giá riêng từng gói. Danh sách có STT, tài khoản, số đơn bán, số dư và bảng giá. Mật khẩu được băm PBKDF2, không hiển thị lại. Giá riêng được lưu trong bảng `settings` hiện có, không cần migration mới; để trống để dùng giá chung, nhập 0 để miễn phí. Khi CTV tạo đơn, máy chủ áp dụng giá riêng và trừ ví trong cùng giao dịch; đơn cũ giữ nguyên số tiền. Dữ liệu tài khoản/ví NoDNS không tự nhập về hệ thống nội bộ. NoDNS tiếp tục được dùng làm nhà cung cấp cấp Gold.
 
 Kho bài viết được nhập với quyền sử dụng do chủ website xác nhận từ `https://locketgold.app/bai-viet`: 2.499 bài, lưu riêng tại `public/imported-posts/` và ảnh tại `public/images/imported-posts/`. Trang bài viết ghép kho này với các bài được đăng qua quản trị và phân trang 20 bài/trang. Nội dung giữ tiêu đề, ngày đăng, phần giới thiệu và các đoạn, danh sách, định dạng của trang nguồn; mã thực thi của trang nguồn không được nhập.
 
@@ -192,10 +192,10 @@ Trong admin → **API NoDNS → Đổi API key NoDNS**, nhập khóa mới rồi
 
 Đã đối chiếu [API admin/CTV](https://github.com/Duckcozy/api-admin-and-ctv), [API web chính](https://github.com/Duckcozy/api-web-ch-nh) và [demo admin](https://github.com/Duckcozy/trang-admin-demo). Các repo chứa tài liệu Postman và demo HTML.
 
-`wrangler.jsonc` dùng `NODNS_API_BASE_URL=https://ctv.nodns.vn`, `NODNS_ADMIN_AUTH=false`, `ADMIN_USERNAME=admin` và `NODNS_CTV_PORTAL=true`.
+`wrangler.jsonc` dùng `NODNS_API_BASE_URL=https://ctv.nodns.vn`, `NODNS_ADMIN_AUTH=false`, `ADMIN_USERNAME=admin` và `NODNS_CTV_PORTAL=false` để quản lý CTV nội bộ.
 
 - Admin website dùng `ADMIN_USERNAME` và secret `ADMIN_PASSWORD_SHA256`. Muốn dùng tài khoản NoDNS, đổi `NODNS_ADMIN_AUTH=true`; khi đó đăng nhập qua `/api/auth/login` và kiểm tra phiên qua `/api/auth/me`. Quản lý website vẫn dùng D1 của website.
-- CTV đăng nhập qua `/api/ctv/auth/login`, xem tài khoản và lịch sử NoDNS. Tạo đơn gọi `/api/ctv/lookup` rồi `/api/ctv/upgrade`, sử dụng lượt NoDNS.
+- CTV mặc định đăng nhập bằng tài khoản D1 do admin tạo, dùng ví và giá riêng trên locketgold.info. Nếu chủ động chuyển `NODNS_CTV_PORTAL=true`, hệ thống dùng nhánh đăng nhập NoDNS `/api/ctv/auth/login`, tra cứu `/api/ctv/lookup` và cấp Gold `/api/ctv/upgrade` bằng lượt NoDNS; tài khoản nội bộ không dùng cho chế độ này.
 - Khách lẻ tra cứu tên, avatar và trạng thái Gold qua `/api/v1/userinfo` trước khi xác nhận tài khoản.
 - Khi SePay xác nhận thanh toán, Worker gọi `/api/v1/grant` với `{user, days, note}`: tháng = 30 ngày, năm = 365 ngày, vĩnh viễn bỏ `days`. Chỉ `status=success` và `data.active=true` mới hoàn tất đơn. Lỗi hoặc phản hồi chờ giữ đơn ở `paid`, cần đối soát; Worker không tự gọi lại grant để tránh trừ lượt trùng.
 - API cấp Gold áp dụng cho iOS. Android tải APK trực tiếp trên trang đơn sau khi xác nhận thanh toán.
