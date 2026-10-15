@@ -1,4 +1,5 @@
 import { normalizeUsername } from "../src/username.js";
+import { ctvCredits, ctvUnitPrice } from "../src/ctv-pricing.js";
 import { DEFAULT_PLANS } from "../src/plans.js";
 import { activationConfirmed } from "./activation.js";
 import { adminCredential, passwordHash, verifyAdminPassword } from "./admin-account.js";
@@ -632,7 +633,7 @@ async function adminCreateCtv(request, env) {
   const initialBalance = Number(body.initial_balance || 0);
   if (!/^[a-z0-9_.-]{3,50}$/.test(username) || password.length < 10 || password.length > 1000) throw httpError(400, "Tên đăng nhập cần 3–50 ký tự chữ, số, dấu chấm, gạch dưới hoặc gạch ngang; mật khẩu cần 10–1000 ký tự.");
   if (!Number.isSafeInteger(initialBalance) || initialBalance < 0 || initialBalance > 1_000_000_000) throw httpError(400, "Số dư ban đầu không hợp lệ.");
-  const prices = validateCtvPrices(body.prices || {});
+  const prices = validateCtvPrices(body.unit_price !== undefined ? { unit_price: body.unit_price } : body.prices || {});
   if (await env.DB.prepare("SELECT id FROM ctv_users WHERE username = ? COLLATE NOCASE").bind(username).first()) throw httpError(409, "Tên tài khoản CTV đã tồn tại.");
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const passwordHash = `pbkdf2-sha256$100000$${await pbkdf2(password, salt)}`;
@@ -652,8 +653,11 @@ function validateCtvPrices(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw httpError(400, "Bảng giá CTV không hợp lệ.");
   const prices = {};
   for (const [id, raw] of Object.entries(value)) {
-    if (!DEFAULT_PLANS.some((plan) => plan.id === id)) throw httpError(400, "Gói CTV không hợp lệ.");
-    if (raw === "" || raw === null) continue;
+    if (id !== "unit_price" && !DEFAULT_PLANS.some((plan) => plan.id === id)) throw httpError(400, "Gói CTV không hợp lệ.");
+    if (raw === "" || raw === null) {
+      if (id === "unit_price") throw httpError(400, "Cần nhập giá 1 lượt cho CTV.");
+      continue;
+    }
     if (!["number", "string"].includes(typeof raw) || String(raw).trim() === "") throw httpError(400, "Giá CTV không hợp lệ.");
     const price = Number(raw);
     if (!Number.isSafeInteger(price) || price < 0 || price > 100_000_000) throw httpError(400, "Giá CTV phải từ 0 đến 100.000.000đ.");
@@ -677,7 +681,8 @@ async function adminListCtv(request, env) {
   ]);
   const { plans } = await plansResponse.json();
   const prices = new Map((stored || []).map((row) => [row.key, validateCtvPrices(JSON.parse(row.value))]));
-  const ctv = (users || []).map((user) => ({ ...user, balance: Number(user.balance), sold_orders: Number(user.sold_orders), prices: prices.get(`ctv_prices:${user.id}`) || {} }));
+  const defaultUnitPrice = plans.find((plan) => plan.id === "ios-month")?.price ?? DEFAULT_PLANS[0].price;
+  const ctv = (users || []).map((user) => ({ ...user, balance: Number(user.balance), sold_orders: Number(user.sold_orders), unit_price: ctvUnitPrice(prices.get(`ctv_prices:${user.id}`) || {}, defaultUnitPrice) }));
   return json({ ctv, plans: plans.filter((plan) => plan.platform === "iOS"), stats: { count: ctv.length, sold_orders: ctv.reduce((total, user) => total + user.sold_orders, 0), balance: ctv.reduce((total, user) => total + user.balance, 0) } });
 }
 
@@ -686,10 +691,10 @@ async function adminCtvPrices(request, env) {
   const body = await readJson(request);
   const id = Number(body.id);
   if (!Number.isSafeInteger(id) || id < 1) throw httpError(400, "CTV không hợp lệ.");
-  const prices = validateCtvPrices(body.prices);
+  const prices = validateCtvPrices(body.unit_price !== undefined ? { unit_price: body.unit_price } : body.prices);
   if (!await env.DB.prepare("SELECT id FROM ctv_users WHERE id = ? AND active = 1").bind(id).first()) throw httpError(404, "Không tìm thấy CTV.");
   await env.DB.prepare("INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP").bind(`ctv_prices:${id}`, JSON.stringify(prices)).run();
-  return json({ message: "Đã lưu giá riêng cho CTV. Các đơn đã tạo giữ nguyên số tiền." });
+  return json({ message: "Đã lưu giá 1 lượt cho CTV. Các đơn đã tạo giữ nguyên số tiền." });
 }
 
 async function adminUpdateCtvBalance(request, env) {
@@ -741,12 +746,13 @@ async function ctvCreateOrder(request, env, ctx) {
   const body = await readJson(request);
   const username = normalizeUsername(body.username);
   const originalPlan = await findPlan(env, body.plan_id);
-  if (!username || !originalPlan || originalPlan.platform !== "iOS") throw httpError(400, "CTV chỉ hỗ trợ các gói Locket Gold iOS.");
+  if (!username || !originalPlan || originalPlan.platform !== "iOS" || !ctvCredits(originalPlan.id)) throw httpError(400, "CTV chỉ hỗ trợ các gói Locket Gold iOS.");
   const plan = { ...originalPlan };
   const user = await env.DB.prepare("SELECT id, username, balance FROM ctv_users WHERE id = ? AND active = 1").bind(Number(session.sub)).first();
   if (!user) throw httpError(401, "Tài khoản không còn hoạt động.");
   const prices = await ctvPrices(env, user.id);
-  plan.price = prices[plan.id] ?? plan.price;
+  const monthPlan = await findPlan(env, "ios-month");
+  plan.price = ctvUnitPrice(prices, monthPlan.price) * ctvCredits(plan.id);
   if (Number(user.balance) < Number(plan.price)) throw httpError(400, "Số dư CTV không đủ để tạo đơn.");
   const code = `LG${randomCode(8)}`;
   const insert = env.DB.prepare("INSERT INTO orders (code, username, contact, plan_id, plan_name, platform, subtotal, discount_amount, amount, ctv_id, status, paid_at) SELECT ?, ?, ?, ?, ?, ?, ?, 0, ?, id, 'paid', CURRENT_TIMESTAMP FROM ctv_users WHERE id = ? AND active = 1 AND balance >= ?")
@@ -762,7 +768,8 @@ async function ctvPublicUser(env, user) {
   const totals = await env.DB.prepare("SELECT COUNT(*) order_count, SUM(CASE WHEN status IN ('paid','completed') THEN 1 ELSE 0 END) completed_count FROM orders WHERE ctv_id = ?").bind(user.id).first();
   const prices = await ctvPrices(env, user.id);
   const { plans } = await (await getPlans(env)).json();
-  return { username: user.username, balance: Number(user.balance || 0), order_count: Number(totals?.order_count || 0), completed_count: Number(totals?.completed_count || 0), plans: plans.filter((plan) => plan.platform === "iOS").map((plan) => ({ ...plan, price: prices[plan.id] ?? plan.price })) };
+  const unitPrice = ctvUnitPrice(prices, plans.find((plan) => plan.id === "ios-month")?.price ?? DEFAULT_PLANS[0].price);
+  return { username: user.username, balance: Number(user.balance || 0), unit_price: unitPrice, available_credits: unitPrice > 0 ? Math.floor(Number(user.balance || 0) / unitPrice) : null, order_count: Number(totals?.order_count || 0), completed_count: Number(totals?.completed_count || 0), plans: plans.filter((plan) => ctvCredits(plan.id)).map((plan) => ({ ...plan, credits: ctvCredits(plan.id), price: unitPrice * ctvCredits(plan.id) })) };
 }
 
 async function findPlan(env, id) {
