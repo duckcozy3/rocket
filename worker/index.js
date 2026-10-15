@@ -389,30 +389,32 @@ async function adminOverview(request, env) {
   const storedKey = env.NODNS_CREDENTIALS_ENABLED === "true" && env.DB ? await env.DB.prepare("SELECT provider FROM provider_credentials WHERE provider = 'nodns'").first() : null;
   const integration = { database: Boolean(env.DB), remote_ctv: env.NODNS_CTV_PORTAL === "true", nodns_key: Boolean(storedKey || env.NODNS_API_KEY), remote_admin: env.NODNS_ADMIN_AUTH === "true" };
   if (!env.DB) return json({ orders: 0, paid_orders: 0, ctv_users: 0, posts: 0, integration });
-  const [orders, paid, ctv, posts] = await Promise.all([
-    count(env, "SELECT COUNT(*) count FROM orders WHERE ctv_id IS NULL"),
-    count(env, "SELECT COUNT(*) count FROM orders WHERE status IN ('paid','completed')"),
+  const [orderStats, ctv, posts] = await Promise.all([
+    visibleAdminOrdersQuery(env, "COUNT(*) AS count, COALESCE(SUM(CASE WHEN status IN ('paid','completed') THEN 1 ELSE 0 END), 0) AS paid_count"),
     count(env, "SELECT COUNT(*) count FROM ctv_users WHERE active = 1"),
     count(env, "SELECT COUNT(*) count FROM posts WHERE status = 'published'"),
   ]);
-  return json({ orders, paid_orders: paid, ctv_users: ctv, posts, integration });
+  const stats = orderStats.results?.[0] || {};
+  return json({ orders: Number(stats.count || 0), paid_orders: Number(stats.paid_count || 0), ctv_users: ctv, posts, integration });
 }
 
 async function adminOrders(request, env) {
   await requireSession(request, env, "admin"); requireDb(env);
   await expirePendingOrders(env);
-  const base = "SELECT code, username, contact, plan_name, amount, status, expires_at, expired_at, gold_revoked_at, created_at FROM orders WHERE expired_at IS NULL";
-  const suffix = " AND NOT EXISTS (SELECT 1 FROM settings WHERE key = 'admin_deleted_order:' || orders.code) ORDER BY created_at DESC LIMIT 100";
-  let data;
+  const { results } = await visibleAdminOrdersQuery(env, "code, username, contact, plan_name, amount, status, expires_at, expired_at, gold_revoked_at, created_at", " ORDER BY created_at DESC LIMIT 100");
+  return json({ orders: results || [] });
+}
+
+async function visibleAdminOrdersQuery(env, columns, tail = "") {
+  const base = `SELECT ${columns} FROM orders WHERE expired_at IS NULL`;
+  const suffix = " AND NOT EXISTS (SELECT 1 FROM settings WHERE key = 'admin_deleted_order:' || orders.code)" + tail;
   try {
-    data = await env.DB.prepare(`${base} AND admin_deleted_at IS NULL${suffix}`).all();
+    return await env.DB.prepare(`${base} AND admin_deleted_at IS NULL${suffix}`).all();
   } catch (error) {
     if (!missingAdminDeletedColumn(error)) throw error;
     // Existing production databases may not have migration 0011 yet.
-    data = await env.DB.prepare(`${base}${suffix}`).all();
+    return await env.DB.prepare(`${base}${suffix}`).all();
   }
-  const { results } = data;
-  return json({ orders: results || [] });
 }
 
 async function adminDeleteOrder(request, env, code) {

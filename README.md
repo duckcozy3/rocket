@@ -6,6 +6,8 @@ Website nhiều trang cho `locketgold.info`, gồm giao diện bán gói, tải 
 
 Danh sách đơn quản trị hiển thị thời gian đặt theo giờ Việt Nam và tự cập nhật mỗi 10 giây khi đang mở. Đơn hết hạn thanh toán tự ẩn. Nút **Xoá** yêu cầu xác nhận và chỉ xoá đơn khỏi danh sách quản trị; dữ liệu đơn và lịch sử thanh toán vẫn được giữ để đối soát. Thao tác này không huỷ quyền Gold hoặc hoàn tiền.
 
+Thống kê **Tổng đơn hàng** và **Đã thanh toán** dùng cùng bộ lọc với danh sách đơn: không tính đơn hết hạn hoặc đã xoá. Tổng bao gồm cả đơn CTV, tính toàn bộ đơn phù hợp; bảng chỉ hiển thị 100 đơn mới nhất. Thống kê cập nhật khi mở bảng điều khiển, sau khi xoá đơn và mỗi 10 giây khi bảng điều khiển đang hiển thị.
+
 Chức năng danh sách và xoá đơn hỗ trợ cả cơ sở dữ liệu chưa có migration `0011_admin_order_deletion.sql`: khi thiếu cột `admin_deleted_at`, dấu xoá được lưu trong bảng `settings` hiện có. Đơn đã xoá vẫn được giữ ẩn sau khi áp dụng migration. Có thể cập nhật schema theo quy trình thông thường:
 
 ```powershell

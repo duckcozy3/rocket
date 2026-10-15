@@ -21,6 +21,7 @@ for (const migrated of [false, true]) {
           return {
             bind(...values) { args = values; return this; },
             async all() { return { results: sqlite.prepare(sql).all(...args) }; },
+            async first() { return sqlite.prepare(sql).get(...args) || null; },
             async run() { const result = sqlite.prepare(sql).run(...args); return { meta: { changes: Number(result.changes) } }; },
           };
         },
@@ -33,13 +34,22 @@ for (const migrated of [false, true]) {
       assert.equal(login.status, 200);
       const cookie = login.headers.get("Set-Cookie").split(";")[0];
       const call = (path = "", method = "GET") => worker.fetch(new Request(`${site}/api/admin/orders${path}`, { method, headers: { Cookie: cookie, Origin: site } }), env, {});
+      const overview = async () => {
+        const response = await worker.fetch(new Request(`${site}/api/admin/overview`, { headers: { Cookie: cookie } }), env, {});
+        assert.equal(response.status, 200);
+        return response.json();
+      };
       const list = await call();
       assert.equal(list.status, 200);
       assert.deepEqual((await list.json()).orders.map((order) => order.code).sort(), ["LGOLDPAID", "LGOLDPENDING"]);
+      assert.equal((await overview()).orders, 2);
+      assert.equal((await overview()).paid_orders, 1);
       assert.equal((await call("/LGOLDPAID", "DELETE")).status, 200);
       assert.equal((await call("/LGOLDPAID", "DELETE")).status, 404);
       assert.equal((await call("/MISSING", "DELETE")).status, 404);
       assert.deepEqual((await (await call()).json()).orders.map((order) => order.code), ["LGOLDPENDING"]);
+      assert.equal((await overview()).orders, 1);
+      assert.equal((await overview()).paid_orders, 0);
       const original = sqlite.prepare("SELECT status, amount FROM orders WHERE code = 'LGOLDPAID'").get();
       assert.equal(original.status, "completed");
       assert.equal(original.amount, 79000);
@@ -48,7 +58,12 @@ for (const migrated of [false, true]) {
       if (!migrated) {
         sqlite.exec(await readFile(new URL("../migrations/0011_admin_order_deletion.sql", import.meta.url), "utf8"));
         assert.deepEqual((await (await call()).json()).orders.map((order) => order.code), ["LGOLDPENDING"]);
+        assert.equal((await overview()).orders, 1);
       }
+      for (let index = 0; index < 105; index++) insert.run(`LGNEW${index}`, "paid", "2026-01-01T00:00:00Z");
+      assert.equal((await (await call()).json()).orders.length, 100);
+      assert.equal((await overview()).orders, 106);
+      assert.equal((await overview()).paid_orders, 105);
     } finally { sqlite.close(); }
   });
 }

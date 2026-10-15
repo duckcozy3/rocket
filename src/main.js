@@ -611,7 +611,7 @@ async function renderAdmin() {
   document.querySelector("#admin-login-wrap").hidden = true;
   const dash = document.querySelector("#admin-dashboard");
   dash.hidden = false;
-  dash.innerHTML = `<aside class="admin-sidebar">${brand()}<nav><a href="#overview">▦ Bảng điều khiển</a><a href="#orders-admin">▤ Đơn hàng</a><a href="#plans-admin">⌑ Bảng giá</a><a href="#posts">✎ Bài viết</a><a href="#promos">％ Mã giảm giá</a><a href="#settings">⚙ Cấu hình công khai</a><a href="#ctv-admin">♙ Cộng tác viên</a></nav><button id="admin-logout">Đăng xuất</button></aside><div class="admin-main"><div class="admin-top"><div><small>QUẢN TRỊ / Bảng điều khiển</small><h1>Quản lý Locket Gold</h1></div><a class="button button--small" href="/">Xem trang web ↗</a></div><section id="overview" class="metric-grid"><article><span>Đơn khách lẻ</span><strong>${Number(data.orders || 0)}</strong></article><article><span>Đã thanh toán</span><strong>${Number(data.paid_orders || 0)}</strong></article><article><span>Cộng tác viên</span><strong>${Number(data.ctv_users || 0)}</strong></article><article><span>Bài viết</span><strong>${Number(data.posts || 0)}</strong></article></section>${adminForms()}</div>`;
+  dash.innerHTML = `<aside class="admin-sidebar">${brand()}<nav><a href="#overview">▦ Bảng điều khiển</a><a href="#orders-admin">▤ Đơn hàng</a><a href="#plans-admin">⌑ Bảng giá</a><a href="#posts">✎ Bài viết</a><a href="#promos">％ Mã giảm giá</a><a href="#settings">⚙ Cấu hình công khai</a><a href="#ctv-admin">♙ Cộng tác viên</a></nav><button id="admin-logout">Đăng xuất</button></aside><div class="admin-main"><div class="admin-top"><div><small>QUẢN TRỊ / Bảng điều khiển</small><h1>Quản lý Locket Gold</h1></div><a class="button button--small" href="/">Xem trang web ↗</a></div><section id="overview" class="metric-grid"><article><span>Tổng đơn hàng</span><strong data-admin-metric="orders">${Number(data.orders || 0)}</strong></article><article><span>Đã thanh toán</span><strong data-admin-metric="paid_orders">${Number(data.paid_orders || 0)}</strong></article><article><span>Cộng tác viên</span><strong data-admin-metric="ctv_users">${Number(data.ctv_users || 0)}</strong></article><article><span>Bài viết</span><strong data-admin-metric="posts">${Number(data.posts || 0)}</strong></article></section>${adminForms()}</div>`;
   document.querySelector("#admin-logout").addEventListener("click", async () => { await api("/api/admin/logout", { method: "POST" }); location.reload(); });
   const integration = data.integration || {};
   const provider = document.createElement("section");
@@ -657,6 +657,7 @@ async function renderAdmin() {
       else link.removeAttribute("aria-current");
     });
     if (selected.id === "orders-admin") loadAdminOrders();
+    if (selected.id === "overview") loadAdminOverview();
     if (selected.id === "promos") selected.dispatchEvent(new Event("promos-refresh"));
   };
   navLinks.forEach((link) => link.addEventListener("click", () => activate(link.hash)));
@@ -665,6 +666,7 @@ async function renderAdmin() {
   window.clearInterval(window.adminOrdersRefreshTimer);
   window.adminOrdersRefreshTimer = window.setInterval(() => {
     if (!document.hidden && !document.querySelector("#orders-admin")?.hidden && !dash.querySelector("[data-delete-order]:disabled")) loadAdminOrders();
+    if (!document.hidden && !dash.querySelector("#overview")?.hidden) loadAdminOverview();
   }, 10000);
   bindAdminForms();
   initPostImages(dash, api);
@@ -677,6 +679,19 @@ function adminForms() {
   <section id="promos" class="admin-panel"><h2>Tạo mã giảm giá</h2><form data-admin-endpoint="/api/admin/promos"><div class="form-row"><label>Mã<input name="code" required maxlength="32"></label><label>Phần trăm<input name="percent" type="number" min="1" max="100" required></label></div><label>Ngày hết hạn<input name="expires_at" type="datetime-local"></label><button class="button" type="submit">Lưu mã</button><p class="form-message"></p></form></section>
   <section id="settings" class="admin-panel"><h2>Cấu hình đường dẫn</h2><p>Đổi khóa NoDNS tại mục API NoDNS. Khóa xác thực SePay được quản lý trong cấu hình máy chủ.</p><form data-admin-endpoint="/api/admin/settings"><label>Đường dẫn tải DNS<input name="dns_url" type="url"></label><label>Đường dẫn APK Android<input name="apk_url" type="url"></label><label>API kích hoạt (URL, không phải khóa API)<input name="upstream_api_url" type="url"></label><label>Nhóm hỗ trợ Zalo<input name="support_zalo" type="url" placeholder="https://zalo.me/..."></label><label>Trang hỗ trợ Facebook<input name="support_facebook" type="url" placeholder="https://facebook.com/..."></label><label>Telegram hỗ trợ<input name="support_telegram" type="url" placeholder="https://t.me/ten_tai_khoan"></label><button class="button" type="submit">Lưu cấu hình</button><p class="form-message"></p></form></section>
   <section id="ctv-admin" class="admin-panel"><h2>Tạo tài khoản CTV</h2><form data-admin-endpoint="/api/admin/ctv"><div class="form-row"><label>Tên đăng nhập<input name="username" required></label><label>Mật khẩu ban đầu<input name="password" type="password" minlength="10" required></label></div><label>Số dư ban đầu<input name="initial_balance" type="number" min="0" step="1000" value="0"></label><button class="button" type="submit">Tạo CTV</button><p class="form-message"></p></form><hr><h2>Điều chỉnh số dư</h2><form data-admin-endpoint="/api/admin/ctv/balance"><div class="form-row"><label>Tên đăng nhập CTV<input name="username" required></label><label>Số tiền thay đổi<input name="delta" type="number" step="1000" required placeholder="50000 hoặc -50000"></label></div><button class="button" type="submit">Cập nhật số dư</button><p class="form-message"></p></form></section>`;
+}
+
+let adminOverviewLoading = false;
+async function loadAdminOverview() {
+  if (adminOverviewLoading) return;
+  adminOverviewLoading = true;
+  try {
+    const data = await api("/api/admin/overview");
+    document.querySelectorAll("[data-admin-metric]").forEach((element) => {
+      element.textContent = Number(data[element.dataset.adminMetric] || 0);
+    });
+  } catch (error) { console.error("Không tải được thống kê quản trị", error); }
+  finally { adminOverviewLoading = false; }
 }
 
 let adminOrdersLoading = false;
@@ -695,6 +710,7 @@ async function loadAdminOrders() {
       try {
         await api(`/api/admin/orders/${encodeURIComponent(code)}`, { method: "DELETE" });
         await loadAdminOrders();
+        await loadAdminOverview();
       } catch (error) { window.alert(error.message); button.disabled = false; }
     }));
     target.querySelectorAll("tbody tr").forEach((row, index) => {
