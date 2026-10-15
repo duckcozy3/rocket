@@ -5,6 +5,20 @@ const paths = { crown: 'm3 7 4 4 5-7 5 7 4-4-2 13H5Z', bolt: 'm13 2-9 12h7l-1 8 
 const icon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"> <path d="${paths[name] || paths.bolt}"/></svg>`;
 const nav = [["activate", "bolt", "Kích Hoạt Gold"], ["deposit", "wallet", "Nạp Tiền"], ["credits", "cart", "Mua Lượt"], ["guide", "book", "Hướng Dẫn"], ["history", "history", "Lịch Sử Đơn"], ["settings", "key", "API & Cài Đặt"]];
 
+export function ctvProfileMarkup(profile, requestedUsername, esc) {
+  const username = profile.username || requestedUsername;
+  const name = profile.full_name || profile.displayName || profile.name || username;
+  let avatar = "";
+  try {
+    const url = new URL(profile.avatar);
+    if (url.protocol === "https:") avatar = url.href;
+  } catch { /* Use the initial when the account has no valid avatar. */ }
+  const initial = `<span class="ctvp-avatar is-complete"${avatar ? " hidden" : ""}>${esc(String(name).slice(0, 1).toUpperCase())}</span>`;
+  const photo = avatar ? `<img class="ctvp-avatar ctvp-profile-photo" src="${esc(avatar)}" alt="Avatar ${esc(username)}" referrerpolicy="no-referrer">` : "";
+  const hasGold = profile.gold?.has_gold === true;
+  return `<div class="ctvp-profile-result">${photo}${initial}<div class="ctvp-profile-details"><strong>${esc(name)}</strong><small>@${esc(username)}</small>${profile.uid ? `<small>UID: ${esc(profile.uid)}</small>` : ""}${hasGold && profile.gold.expiry_date ? `<small>Hết hạn Gold: ${esc(profile.gold.expiry_date)}</small>` : ""}</div><span class="ctvp-badge${hasGold ? " is-complete" : ""}">${hasGold ? "Đang có Gold" : "Chưa có Gold"}</span></div>`;
+}
+
 export function ctvPortalMarkup(user, remote, { escapeHtml: esc, money, plans }) {
   const options = plans.filter((plan) => !remote || plan.platform === "iOS");
   return `<aside class="ctvp-sidebar"><a class="ctvp-brand" href="/"><span>${icon("crown")}</span><div><strong>Portal CTV</strong><small>Locket Gold · locketgold.info</small></div></a>
@@ -12,7 +26,7 @@ export function ctvPortalMarkup(user, remote, { escapeHtml: esc, money, plans })
     <nav aria-label="Cộng tác viên">${nav.map(([id, symbol, title]) => `<button type="button" data-ctv-nav="${id}" class="${id === "activate" ? "is-active" : ""}">${icon(symbol)}${title}</button>`).join("")}</nav><button type="button" class="ctvp-logout" id="ctv-logout">${icon("logout")}Đăng Xuất</button></aside>
     <main class="ctvp-main"><header class="ctvp-top"><h1>${icon("bolt")}<span id="ctv-section-title">Kích Hoạt Gold</span></h1><div><span class="ctvp-pill">${icon("bolt")}<b data-ctv-quota>${Number(remote ? user.remaining || 0 : user.order_count || 0)}</b> ${remote ? "lượt" : "đơn"}</span><span class="ctvp-pill ctvp-pill--gold">${icon("wallet")}<b data-ctv-balance>${money(user.balance)}</b></span></div></header>
     <div class="ctvp-content"><section class="ctvp-metrics" aria-label="Thống kê tài khoản"><article class="ctvp-purple"><span>${remote ? "LƯỢT CÒN LẠI" : "TỔNG ĐƠN"}</span><strong data-ctv-quota>${Number(remote ? user.remaining || 0 : user.order_count || 0)}</strong></article><article class="ctvp-amber"><span>SỐ DƯ VÍ</span><strong data-ctv-balance>${money(user.balance)}</strong></article><article class="ctvp-green"><span>ĐƠN HOÀN TẤT</span><strong id="ctv-completed">—</strong></article><article class="ctvp-blue"><span>TỔNG ĐƠN</span><strong id="ctv-total">—</strong></article></section>
-    <div class="ctvp-columns" data-ctv-panel="activate"><div class="ctvp-left"><section class="ctvp-card"><h2>Kích Hoạt Locket Gold</h2><p class="ctvp-muted">Nhập username hoặc link Locket của khách</p><form id="ctv-order-form"><label class="ctvp-sr" for="ctvp-username">Username hoặc link Locket</label><div class="ctvp-lookup"><div class="ctvp-input"><input id="ctvp-username" name="username" placeholder="Username hoặc locket.cam/…" required maxlength="300" autocomplete="off"><button type="button" id="ctvp-paste">▣ Dán</button></div><button class="ctvp-primary" type="button" id="ctvp-lookup">${icon("search")}Tìm</button></div><div id="ctvp-profile" aria-live="polite"></div><fieldset class="ctvp-packages"><legend>Thời hạn kích hoạt</legend>${options.map((plan, index) => `<label><input type="radio" name="plan_id" value="${esc(plan.id)}" ${index === 0 ? "checked" : ""} required><span><strong>${esc(plan.name.replace(/^Gói /, ""))}</strong><small>${remote ? (plan.id === "ios-lifetime" ? "2 lượt" : "1 lượt") : money(plan.price)}</small></span></label>`).join("")}</fieldset><div class="ctvp-flight">${icon("plane")}<div><strong>Quản lý TestFlight</strong><small>Kiểm tra và quản lý TestFlight tại cổng NoDNS.</small></div></div><button class="ctvp-primary ctvp-upgrade" type="submit">${icon("bolt")}${remote ? "Lên Gold" : "Tạo đơn từ số dư"}</button><p class="form-message" aria-live="polite"></p></form></section>
+    <div class="ctvp-columns" data-ctv-panel="activate"><div class="ctvp-left"><section class="ctvp-card"><h2>Kích Hoạt Locket Gold</h2><p class="ctvp-muted">Nhập username hoặc link Locket của khách</p><form id="ctv-order-form"><label class="ctvp-sr" for="ctvp-username">Username hoặc link Locket</label><div class="ctvp-lookup"><div class="ctvp-input"><input id="ctvp-username" name="username" placeholder="Username hoặc locket.cam/…" required maxlength="300" autocomplete="off"><button type="button" id="ctvp-paste">▣ Dán</button></div><button class="ctvp-primary" type="button" id="ctvp-lookup">${icon("search")}Tìm</button></div><div id="ctvp-profile" aria-live="polite"></div><fieldset class="ctvp-packages"><legend>Thời hạn kích hoạt</legend>${options.map((plan, index) => `<label><input type="radio" name="plan_id" value="${esc(plan.id)}" ${index === 0 ? "checked" : ""} required><span><strong>${esc(plan.name.replace(/^Gói /, ""))}</strong><small>${remote ? (plan.id === "ios-lifetime" ? "2 lượt" : "1 lượt") : money(plan.price)}</small></span></label>`).join("")}</fieldset><button class="ctvp-primary ctvp-upgrade" type="submit">${icon("bolt")}${remote ? "Lên Gold" : "Tạo đơn từ số dư"}</button><p class="form-message" aria-live="polite"></p></form></section>
     <section class="ctvp-card ctvp-guide"><h2>${icon("star")}Hướng dẫn</h2><ol><li>Nhập username Locket của khách hoặc dán link hồ sơ.</li><li>Nhấn <b>Tìm</b> để kiểm tra tài khoản.</li><li>Chọn thời hạn và nhấn <b>Lên Gold</b> để kích hoạt.</li></ol><p class="ctvp-muted">${remote ? "Số lượt thực tế được trừ theo cấu hình gói trên NoDNS." : "Đơn CTV được thanh toán từ số dư tài khoản."}</p></section></div>
     <section class="ctvp-card ctvp-list"><div class="ctvp-list-head"><h2>Danh Sách Gold <span id="ctvp-list-count"></span></h2><div><input id="ctvp-search" type="search" placeholder="Tìm…" aria-label="Tìm tài khoản hoặc mã đơn"><button type="button" id="ctvp-refresh" aria-label="Làm mới danh sách">${icon("refresh")}</button></div></div><div id="ctv-orders" aria-live="polite"><p class="ctvp-empty">Đang tải danh sách…</p></div></section></div>
     <section class="ctvp-card" data-ctv-panel="secondary" hidden><div id="ctvp-secondary"></div></section></div></main>`;
@@ -63,19 +77,42 @@ export async function mountCtvPortal(root, user, remote, helpers) {
   root.querySelector("#ctvp-search").addEventListener("input", drawOrders);
   root.querySelector("#ctv-logout").addEventListener("click", async () => { try { await api("/api/ctv/logout", { method: "POST" }); location.reload(); } catch (error) { showMessage(error.message, true); } });
   root.querySelector("#ctvp-paste").addEventListener("click", async () => { try { input.value = await navigator.clipboard.readText(); input.dispatchEvent(new Event("input")); input.focus(); } catch { showMessage("Hãy dán username vào ô nhập bằng Ctrl + V.", true); input.focus(); } });
-  input.addEventListener("input", () => { root.querySelector("#ctvp-profile").replaceChildren(); });
-  root.querySelector("#ctvp-lookup").addEventListener("click", async (event) => {
+  let lookupTimer;
+  let lookupVersion = 0;
+  let lastProfileUsername = "";
+  const lookupProfile = async (manual = false) => {
     const username = parsePastedUsername(input.value);
-    if (!username) return showMessage("Nhập username hoặc link hồ sơ Locket hợp lệ.", true);
-    const button = event.currentTarget; button.disabled = true;
+    if (!username) { if (manual) showMessage("Nhập username hoặc link hồ sơ Locket hợp lệ.", true); return; }
+    if (!manual && username === lastProfileUsername) return;
+    const version = ++lookupVersion;
+    const button = root.querySelector("#ctvp-lookup"); button.disabled = true;
+    const target = root.querySelector("#ctvp-profile");
+    target.textContent = "Đang lấy thông tin Locket…";
     try {
-      const result = remote ? await api("/api/ctv/lookup", { method: "POST", body: JSON.stringify({ username }) }) : await api(`/api/locket/userinfo?user=${encodeURIComponent(username)}`);
+      const result = await api(`/api/locket/userinfo?user=${encodeURIComponent(username)}`);
+      if (version !== lookupVersion || parsePastedUsername(input.value) !== username) return;
       const profile = result.user || result.data || result;
-      root.querySelector("#ctvp-profile").innerHTML = `<div class="ctvp-profile-result"><span class="ctvp-avatar is-complete">${esc(username.slice(0, 1).toUpperCase())}</span><div><strong>${esc(profile.displayName || profile.full_name || profile.name || username)}</strong><small>@${esc(username)}</small></div><span class="ctvp-badge is-complete">Đã tìm thấy</span></div>`;
+      target.innerHTML = ctvProfileMarkup(profile, username, esc);
+      target.querySelector("img")?.addEventListener("error", (event) => {
+        if (!target.contains(event.currentTarget)) return;
+        event.currentTarget.hidden = true;
+        target.querySelector(".ctvp-avatar:not(img)").hidden = false;
+      }, { once: true });
+      lastProfileUsername = username;
       showMessage("Đã tìm thấy tài khoản. Chọn gói để cấp Gold.");
-    } catch (error) { showMessage(error.message, true); }
-    finally { button.disabled = false; }
+    } catch (error) { if (version === lookupVersion) { target.replaceChildren(); showMessage(error.message, true); } }
+    finally { if (version === lookupVersion) button.disabled = false; }
+  };
+  input.addEventListener("input", () => {
+    window.clearTimeout(lookupTimer);
+    ++lookupVersion;
+    lastProfileUsername = "";
+    root.querySelector("#ctvp-profile").replaceChildren();
+    root.querySelector("#ctvp-lookup").disabled = false;
+    message.textContent = "";
+    lookupTimer = window.setTimeout(() => lookupProfile(), 800);
   });
+  root.querySelector("#ctvp-lookup").addEventListener("click", () => { window.clearTimeout(lookupTimer); lookupProfile(true); });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const username = parsePastedUsername(input.value);

@@ -104,6 +104,9 @@
 .ctvp-empty { padding: 28px 24px; color: #9ca9c1; }
 .ctvp-profile-result { display: flex; gap: 12px; align-items: center; margin-top: 15px; padding: 13px; border-radius: 14px; background: #102923; }
 .ctvp-profile-result small { display: block; color: #9ab6ac; }
+.ctvp-profile-photo { object-fit: cover; }
+.ctvp-profile-details { min-width: 0; overflow-wrap: anywhere; }
+.ctvp-profile-details small { font-size: 11px; line-height: 1.6; }
 .ctvp-profile-result .ctvp-badge { margin-left: auto; }
 .ctvp-link { margin: 12px 12px 0 0; text-decoration: none; }
 .ctvp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }

@@ -57,7 +57,7 @@ async function route(request, env, ctx, url) {
     const { result } = await providerRequest(env, `/api/v1/userinfo?user=${encodeURIComponent(username)}`);
     const data = unwrap(result);
     if (!data.uid) throw httpError(404, "Không tìm thấy tài khoản Locket.");
-    return json({ username: data.username || username, uid: data.uid, full_name: data.full_name || data.fullName || "", avatar: profileAvatarUrl(data), gold: { has_gold: data.gold?.has_gold === true, expiry_date: data.gold?.expiry_date || null } });
+    return json({ username: data.username || username, uid: data.uid, full_name: data.full_name || data.fullName || data.displayName || data.display_name || data.name || "", avatar: profileAvatarUrl(data), gold: { has_gold: data.gold?.has_gold === true, expiry_date: data.gold?.expiry_date || null } });
   }
   if (env.NODNS_CTV_PORTAL === "true" && pathname.startsWith("/api/ctv/")) return remoteCtvRoute(request, env, pathname);
   if (pathname === "/api/plans" && request.method === "GET") return getPlans(env);

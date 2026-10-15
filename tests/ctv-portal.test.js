@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ctvPortalMarkup } from "../src/ctv-portal.js";
+import { ctvPortalMarkup, ctvProfileMarkup } from "../src/ctv-portal.js";
 import { createPageRenderer } from "../src/page-render.js";
 import { DEFAULT_PLANS } from "../src/plans.js";
 import { remoteLogin, portalOrders } from "../worker/nodns.js";
@@ -40,6 +40,22 @@ test("portal renders remote iOS packages and escapes account data", () => {
   assert.ok(markup.includes('value="ios-lifetime"'));
   assert.ok(!markup.includes('value="android-lifetime"'));
   assert.ok(markup.includes('data-ctv-nav="history"'));
+  assert.ok(!markup.includes("Quản lý TestFlight"));
+});
+
+test("CTV profile shows the NoDNS avatar, name, username, UID and Gold status safely", () => {
+  const { escapeHtml } = createPageRenderer("ctv");
+  const markup = ctvProfileMarkup({ username: "alice", full_name: "Alice <Locket>", uid: "user-1", avatar: "https://cdn2.locketcamera.com/alice.jpg?size=100&token=test", gold: { has_gold: true, expiry_date: "2027-01-01" } }, "requested", escapeHtml);
+  assert.ok(markup.includes('<img class="ctvp-avatar ctvp-profile-photo"'));
+  assert.ok(markup.includes("Alice &lt;Locket&gt;"));
+  assert.ok(markup.includes("@alice"));
+  assert.ok(markup.includes("UID: user-1"));
+  assert.ok(markup.includes("Đang có Gold"));
+  assert.ok(markup.includes("2027-01-01"));
+  assert.ok(markup.includes("&amp;token=test"));
+  const fallback = ctvProfileMarkup({ avatar: "javascript:alert(1)", username: "bob" }, "bob", escapeHtml);
+  assert.ok(!fallback.includes("<img"));
+  assert.ok(fallback.includes("Chưa có Gold"));
 });
 
 test("remote order mapping preserves available timestamps", () => {
