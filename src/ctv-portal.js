@@ -1,5 +1,6 @@
 import { ctvCredits } from "./ctv-pricing.js";
 import { mountCtvDeposit } from "./ctv-deposit.js";
+import { mountCtvBuyCredits } from "./ctv-buy-credits.js";
 import { parsePastedUsername } from "./username.js";
 import { orderCreatedLabel } from "./admin-orders.js";
 
@@ -24,12 +25,12 @@ export function ctvProfileMarkup(profile, requestedUsername, esc) {
 export function ctvPortalMarkup(user, remote, { escapeHtml: esc, money, plans }) {
   const options = plans.filter((plan) => plan.platform === "iOS");
   return `<aside class="ctvp-sidebar"><a class="ctvp-brand" href="/"><span>${icon("crown")}</span><div><strong>Portal CTV</strong><small>Locket Gold · locketgold.info</small></div></a>
-    <div class="ctvp-account"><div class="ctvp-identity"><b>${esc((user.username || "C").slice(0, 1).toUpperCase())}</b><div><strong>${esc(user.username)}</strong><small>@${esc(user.username)}</small></div></div><div class="ctvp-mini"><div><small>SỐ DƯ</small><strong data-ctv-balance>${money(user.balance)}</strong></div><div><small>${"LƯỢT"}</small><strong data-ctv-quota>${remote ? Number(user.remaining || 0) : (user.available_credits ?? (user.unit_price === 0 ? "∞" : 0))}</strong></div></div></div>
+    <div class="ctvp-account"><div class="ctvp-identity"><b>${esc((user.username || "C").slice(0, 1).toUpperCase())}</b><div><strong>${esc(user.username)}</strong><small>@${esc(user.username)}</small></div></div><div class="ctvp-mini"><div><small>SỐ DƯ</small><strong data-ctv-balance>${money(user.balance)}</strong></div><div><small>${"LƯỢT"}</small><strong data-ctv-quota>${remote ? Number(user.remaining || 0) : Number(user.available_credits || 0)}</strong></div></div></div>
     <nav aria-label="Cộng tác viên">${nav.map(([id, symbol, title]) => `<button type="button" data-ctv-nav="${id}" class="${id === "activate" ? "is-active" : ""}">${icon(symbol)}${title}</button>`).join("")}</nav><button type="button" class="ctvp-logout" id="ctv-logout">${icon("logout")}Đăng Xuất</button></aside>
-    <main class="ctvp-main"><header class="ctvp-top"><h1>${icon("bolt")}<span id="ctv-section-title">Kích Hoạt Gold</span></h1><div><span class="ctvp-pill">${icon("bolt")}<b data-ctv-quota>${remote ? Number(user.remaining || 0) : (user.available_credits ?? (user.unit_price === 0 ? "∞" : 0))}</b> ${"lượt"}</span><span class="ctvp-pill ctvp-pill--gold">${icon("wallet")}<b data-ctv-balance>${money(user.balance)}</b></span></div></header>
-    <div class="ctvp-content"><section class="ctvp-metrics" aria-label="Thống kê tài khoản"><article class="ctvp-purple"><span>${"LƯỢT CÒN LẠI"}</span><strong data-ctv-quota>${remote ? Number(user.remaining || 0) : (user.available_credits ?? (user.unit_price === 0 ? "∞" : 0))}</strong></article><article class="ctvp-amber"><span>SỐ DƯ VÍ</span><strong data-ctv-balance>${money(user.balance)}</strong></article><article class="ctvp-green"><span>ĐƠN HOÀN TẤT</span><strong id="ctv-completed">—</strong></article><article class="ctvp-blue"><span>TỔNG ĐƠN</span><strong id="ctv-total">—</strong></article></section>
-    <div class="ctvp-columns" data-ctv-panel="activate"><div class="ctvp-left"><section class="ctvp-card"><h2>Kích Hoạt Locket Gold</h2><p class="ctvp-muted">Nhập username hoặc link Locket của khách</p><form id="ctv-order-form"><label class="ctvp-sr" for="ctvp-username">Username hoặc link Locket</label><div class="ctvp-lookup"><div class="ctvp-input"><input id="ctvp-username" name="username" placeholder="Username hoặc locket.cam/…" required maxlength="300" autocomplete="off"><button type="button" id="ctvp-paste">▣ Dán</button></div><button class="ctvp-primary" type="button" id="ctvp-lookup">${icon("search")}Tìm</button></div><div id="ctvp-profile" aria-live="polite"></div><fieldset class="ctvp-packages"><legend>Thời hạn kích hoạt</legend>${options.map((plan, index) => `<label><input type="radio" name="plan_id" value="${esc(plan.id)}" ${index === 0 ? "checked" : ""} required><span><strong>${esc(plan.name.replace(/^Gói /, ""))}</strong><small>${`${ctvCredits(plan.id)} lượt`}</small></span></label>`).join("")}</fieldset><p class="ctvp-muted" id="ctvp-unit-price">${remote ? "" : `Giá 1 lượt: ${money(user.unit_price)} · Thanh toán từ ví`}</p><button class="ctvp-primary ctvp-upgrade" type="submit">${icon("bolt")}${"Lên Gold"}</button><p class="form-message" aria-live="polite"></p></form></section>
-    <section class="ctvp-card ctvp-guide"><h2>${icon("star")}Hướng dẫn</h2><ol><li>Nhập username Locket của khách hoặc dán link hồ sơ.</li><li>Nhấn <b>Tìm</b> để kiểm tra tài khoản.</li><li>Chọn thời hạn và nhấn <b>Lên Gold</b> để kích hoạt.</li></ol><p class="ctvp-muted">${remote ? "Số lượt thực tế được trừ theo cấu hình gói trên NoDNS." : "1 tháng: 1 lượt · 1 năm: 1 lượt · Vĩnh viễn: 2 lượt. Tiền trừ ví = giá 1 lượt × số lượt."}</p></section></div>
+    <main class="ctvp-main"><header class="ctvp-top"><h1>${icon("bolt")}<span id="ctv-section-title">Kích Hoạt Gold</span></h1><div><span class="ctvp-pill">${icon("bolt")}<b data-ctv-quota>${remote ? Number(user.remaining || 0) : Number(user.available_credits || 0)}</b> ${"lượt"}</span><span class="ctvp-pill ctvp-pill--gold">${icon("wallet")}<b data-ctv-balance>${money(user.balance)}</b></span></div></header>
+    <div class="ctvp-content"><section class="ctvp-metrics" aria-label="Thống kê tài khoản"><article class="ctvp-purple"><span>${"LƯỢT CÒN LẠI"}</span><strong data-ctv-quota>${remote ? Number(user.remaining || 0) : Number(user.available_credits || 0)}</strong></article><article class="ctvp-amber"><span>SỐ DƯ VÍ</span><strong data-ctv-balance>${money(user.balance)}</strong></article><article class="ctvp-green"><span>ĐƠN HOÀN TẤT</span><strong id="ctv-completed">—</strong></article><article class="ctvp-blue"><span>TỔNG ĐƠN</span><strong id="ctv-total">—</strong></article></section>
+    <div class="ctvp-columns" data-ctv-panel="activate"><div class="ctvp-left"><section class="ctvp-card"><h2>Kích Hoạt Locket Gold</h2><p class="ctvp-muted">Nhập username hoặc link Locket của khách</p><form id="ctv-order-form"><label class="ctvp-sr" for="ctvp-username">Username hoặc link Locket</label><div class="ctvp-lookup"><div class="ctvp-input"><input id="ctvp-username" name="username" placeholder="Username hoặc locket.cam/…" required maxlength="300" autocomplete="off"><button type="button" id="ctvp-paste">▣ Dán</button></div><button class="ctvp-primary" type="button" id="ctvp-lookup">${icon("search")}Tìm</button></div><div id="ctvp-profile" aria-live="polite"></div><fieldset class="ctvp-packages"><legend>Thời hạn kích hoạt</legend>${options.map((plan, index) => `<label><input type="radio" name="plan_id" value="${esc(plan.id)}" ${index === 0 ? "checked" : ""} required><span><strong>${esc(plan.name.replace(/^Gói /, ""))}</strong><small>${`${ctvCredits(plan.id)} lượt`}</small></span></label>`).join("")}</fieldset><p class="ctvp-muted" id="ctvp-unit-price">${remote ? "" : `Giá 1 lượt: ${money(user.unit_price)} · Mua lượt từ ví, kích hoạt bằng lượt`}</p><button class="ctvp-primary ctvp-upgrade" type="submit">${icon("bolt")}${"Lên Gold"}</button><p class="form-message" aria-live="polite"></p></form></section>
+    <section class="ctvp-card ctvp-guide"><h2>${icon("star")}Hướng dẫn</h2><ol><li>Nhập username Locket của khách hoặc dán link hồ sơ.</li><li>Nhấn <b>Tìm</b> để kiểm tra tài khoản.</li><li>Chọn thời hạn và nhấn <b>Lên Gold</b> để kích hoạt.</li></ol><p class="ctvp-muted">${remote ? "Số lượt thực tế được trừ theo cấu hình gói trên NoDNS." : "1 tháng: 1 lượt · 1 năm: 1 lượt · Vĩnh viễn: 2 lượt. Kích hoạt chỉ trừ lượt đã mua, không trừ thêm tiền trong ví."}</p></section></div>
     <section class="ctvp-card ctvp-list"><div class="ctvp-list-head"><h2>Danh Sách Gold <span id="ctvp-list-count"></span></h2><div><input id="ctvp-search" type="search" placeholder="Tìm…" aria-label="Tìm tài khoản hoặc mã đơn"><button type="button" id="ctvp-refresh" aria-label="Làm mới danh sách">${icon("refresh")}</button></div></div><div id="ctv-orders" aria-live="polite"><p class="ctvp-empty">Đang tải danh sách…</p></div></section></div>
     <section class="ctvp-card" data-ctv-panel="secondary" hidden><div id="ctvp-secondary"></div></section></div></main>`;
 }
@@ -46,8 +47,8 @@ export async function mountCtvPortal(root, user, remote, helpers) {
   const showMessage = (text, error = false) => { message.textContent = text; message.className = `form-message ${error ? "is-error" : "is-success"}`; };
   const updateAccount = (account) => {
     root.querySelectorAll("[data-ctv-balance]").forEach((el) => { el.textContent = money(account.balance); });
-    root.querySelectorAll("[data-ctv-quota]").forEach((el) => { el.textContent = remote ? Number(account.remaining || 0) : (account.available_credits ?? (account.unit_price === 0 ? "∞" : 0)); });
-    if (!remote) root.querySelector("#ctvp-unit-price").textContent = `Giá 1 lượt: ${money(account.unit_price)} · Thanh toán từ ví`;
+    root.querySelectorAll("[data-ctv-quota]").forEach((el) => { el.textContent = remote ? Number(account.remaining || 0) : Number(account.available_credits || 0); });
+    if (!remote) root.querySelector("#ctvp-unit-price").textContent = `Giá 1 lượt: ${money(account.unit_price)} · Mua lượt từ ví, kích hoạt bằng lượt`;
     if (!remote && account.plans) {
       root.querySelectorAll('[name="plan_id"]').forEach((radio) => {
         const plan = account.plans.find((item) => item.id === radio.value);
@@ -122,7 +123,7 @@ export async function mountCtvPortal(root, user, remote, helpers) {
     if (!username) return showMessage("Username hoặc link hồ sơ không hợp lệ.", true);
     const button = form.querySelector('[type="submit"]'); if (button.disabled) return;
     const planId = new FormData(form).get("plan_id");
-    if (!window.confirm(`Xác nhận cấp Gold cho @${username} với gói đã chọn? ${remote ? "Tài khoản sẽ bị trừ lượt theo gói." : `${ctvCredits(planId)} lượt × ${money(user.unit_price)} = ${money(ctvCredits(planId) * user.unit_price)} sẽ được trừ từ ví.`}`)) return;
+    if (!window.confirm(`Xác nhận cấp Gold cho @${username} với gói đã chọn? ${remote ? "Tài khoản sẽ bị trừ lượt theo gói." : `Sẽ trừ ${ctvCredits(planId)} lượt đã mua, không trừ thêm tiền trong ví.`}`)) return;
     button.disabled = true;
     try { const result = await api("/api/ctv/orders", { method: "POST", body: JSON.stringify({ username, plan_id: planId }) }); showMessage(`${result.message || "Đã gửi yêu cầu."} ${result.code ? `Mã: ${result.code}` : ""}`); await refresh(); }
     catch (error) { showMessage(error.message, true); }
@@ -139,9 +140,14 @@ export async function mountCtvPortal(root, user, remote, helpers) {
     root.querySelector(".ctvp-left").hidden = id === "history";
     root.querySelector(".ctvp-columns").classList.toggle("is-history", id === "history");
     root.querySelector('[data-ctv-panel="secondary"]').hidden = primary;
-    const isDeposit = !remote && (id === "deposit" || id === "credits");
-    root.querySelector(".ctvp-metrics").hidden = isDeposit;
-    root.querySelector('[data-ctv-panel="secondary"]').className = isDeposit ? "ctvp-topup-host" : "ctvp-card";
+    const isBuy = !remote && id === "credits";
+    const isDeposit = !remote && id === "deposit";
+    root.querySelector(".ctvp-metrics").hidden = isDeposit || isBuy;
+    root.querySelector('[data-ctv-panel="secondary"]').className = isDeposit || isBuy ? "ctvp-topup-host" : "ctvp-card";
+    if (isBuy) {
+      disposeDeposit = mountCtvBuyCredits(root.querySelector("#ctvp-secondary"), user, { api, money, escapeHtml: esc }, refresh, () => activatePanel("deposit"));
+      return;
+    }
     if (isDeposit) {
       disposeDeposit = mountCtvDeposit(root.querySelector("#ctvp-secondary"), user, { api, escapeHtml: esc, money }, refresh);
       return;

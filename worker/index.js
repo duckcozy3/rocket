@@ -1,6 +1,7 @@
 import { normalizeUsername } from "../src/username.js";
 import { ctvCredits, ctvUnitPrice } from "../src/ctv-pricing.js";
 import { createCtvTopup, readCtvTopup, creditCtvTopup } from "./ctv-topups.js";
+import { ensureCtvCredits, buyCtvCredits } from "./ctv-credit-wallet.js";
 import { DEFAULT_PLANS } from "../src/plans.js";
 import { activationConfirmed } from "./activation.js";
 import { adminCredential, passwordHash, verifyAdminPassword } from "./admin-account.js";
@@ -117,6 +118,16 @@ async function route(request, env, ctx, url) {
   if (pathname === "/api/admin/ctv/balance" && request.method === "POST") return adminUpdateCtvBalance(request, env);
 
   if (pathname === "/api/ctv/login" && request.method === "POST") return ctvLogin(request, env);
+  if (pathname === "/api/ctv/credits/buy" && request.method === "POST") {
+    requireDb(env);
+    const session = await requireSession(request, env, "ctv");
+    const user = await env.DB.prepare("SELECT id, username, balance FROM ctv_users WHERE id = ? AND active = 1").bind(Number(session.sub)).first();
+    if (!user) throw httpError(401, "Tài khoản không còn hoạt động.");
+    const account = await ctvPublicUser(env, user);
+    const body = await readJson(request);
+    if (body.unit_price !== undefined && Number(body.unit_price) !== account.unit_price) throw httpError(409, "Giá 1 lượt vừa thay đổi. Hãy làm mới trang trước khi mua.");
+    return json({ purchase: await buyCtvCredits(env, user.id, Number(body.quantity), account.unit_price, body.request_id), message: "Đã mua lượt thành công." }, 201);
+  }
   if (pathname === "/api/ctv/topups" && request.method === "POST") {
     requireDb(env);
     const session = await requireSession(request, env, "ctv");
@@ -776,13 +787,16 @@ async function ctvCreateOrder(request, env, ctx) {
   const prices = await ctvPrices(env, user.id);
   const monthPlan = await findPlan(env, "ios-month");
   plan.price = ctvUnitPrice(prices, monthPlan.price) * ctvCredits(plan.id);
-  if (Number(user.balance) < Number(plan.price)) throw httpError(400, "Số dư CTV không đủ để tạo đơn.");
+  await ensureCtvCredits(env, user.id);
+  const creditWallet = await env.DB.prepare("SELECT credits FROM ctv_credits WHERE ctv_id = ?").bind(user.id).first();
+  const requiredCredits = ctvCredits(plan.id);
+  if (Number(creditWallet?.credits || 0) < requiredCredits) throw httpError(400, "Không đủ lượt kích hoạt. Vui lòng mua thêm lượt.");
   const code = `LG${randomCode(8)}`;
-  const insert = env.DB.prepare("INSERT INTO orders (code, username, contact, plan_id, plan_name, platform, subtotal, discount_amount, amount, ctv_id, status, paid_at) SELECT ?, ?, ?, ?, ?, ?, ?, 0, ?, id, 'paid', CURRENT_TIMESTAMP FROM ctv_users WHERE id = ? AND active = 1 AND balance >= ?")
-    .bind(code, username, `CTV:${user.username}`, plan.id, plan.name, plan.platform, Number(plan.price), Number(plan.price), user.id, Number(plan.price));
-  const debit = env.DB.prepare("UPDATE ctv_users SET balance = balance - ? WHERE id = ? AND EXISTS (SELECT 1 FROM orders WHERE code = ? AND ctv_id = ?)").bind(Number(plan.price), user.id, code, user.id);
+  const insert = env.DB.prepare("INSERT INTO orders (code, username, contact, plan_id, plan_name, platform, subtotal, discount_amount, amount, ctv_id, status, paid_at) SELECT ?, ?, ?, ?, ?, ?, ?, 0, ?, id, 'paid', CURRENT_TIMESTAMP FROM ctv_users WHERE id = ? AND active = 1 AND EXISTS (SELECT 1 FROM ctv_credits WHERE ctv_id = ctv_users.id AND credits >= ?)")
+    .bind(code, username, `CTV:${user.username}`, plan.id, plan.name, plan.platform, Number(plan.price), Number(plan.price), user.id, requiredCredits);
+  const debit = env.DB.prepare("UPDATE ctv_credits SET credits = credits - ? WHERE ctv_id = ? AND EXISTS (SELECT 1 FROM orders WHERE code = ? AND ctv_id = ?)").bind(requiredCredits, user.id, code, user.id);
   const results = await env.DB.batch([insert, debit]);
-  if (!results[0].meta?.changes) throw httpError(409, "Số dư vừa thay đổi, vui lòng thử lại.");
+  if (!results[0].meta?.changes) throw httpError(409, "Số lượt vừa thay đổi, vui lòng thử lại.");
   ctx.waitUntil(activateOrder(env, { code, username, plan_id: plan.id, platform: plan.platform }));
   return json({ message: "Đã tạo đơn CTV.", code }, 201);
 }
@@ -792,7 +806,9 @@ async function ctvPublicUser(env, user) {
   const prices = await ctvPrices(env, user.id);
   const { plans } = await (await getPlans(env)).json();
   const unitPrice = ctvUnitPrice(prices, plans.find((plan) => plan.id === "ios-month")?.price ?? DEFAULT_PLANS[0].price);
-  return { username: user.username, balance: Number(user.balance || 0), unit_price: unitPrice, available_credits: unitPrice > 0 ? Math.floor(Number(user.balance || 0) / unitPrice) : null, order_count: Number(totals?.order_count || 0), completed_count: Number(totals?.completed_count || 0), plans: plans.filter((plan) => ctvCredits(plan.id)).map((plan) => ({ ...plan, credits: ctvCredits(plan.id), price: unitPrice * ctvCredits(plan.id) })) };
+  await ensureCtvCredits(env, user.id);
+  const wallet = await env.DB.prepare("SELECT credits FROM ctv_credits WHERE ctv_id = ?").bind(user.id).first();
+  return { username: user.username, balance: Number(user.balance || 0), unit_price: unitPrice, available_credits: Number(wallet?.credits || 0), order_count: Number(totals?.order_count || 0), completed_count: Number(totals?.completed_count || 0), plans: plans.filter((plan) => ctvCredits(plan.id)).map((plan) => ({ ...plan, credits: ctvCredits(plan.id), price: unitPrice * ctvCredits(plan.id) })) };
 }
 
 async function findPlan(env, id) {
