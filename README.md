@@ -15,6 +15,8 @@ npm run deploy
 
 ## Chạy local
 
+Trang `/cong-tac-vien/` sử dụng giao diện Portal CTV tối sau khi đăng nhập: sidebar, số dư/lượt, tra cứu hồ sơ, chọn gói, cấp Gold và tìm kiếm lịch sử. Các mục nạp tiền, mua lượt, quản lý Gold và API dẫn đến cổng NoDNS; tài khoản nội bộ dùng liên hệ hỗ trợ để nạp số dư. Không có API thu hồi Gold CTV hoặc thay đổi TestFlight được tích hợp trong phiên bản này.
+
 Kho bài viết được nhập với quyền sử dụng do chủ website xác nhận từ `https://locketgold.app/bai-viet`: 2.499 bài, lưu riêng tại `public/imported-posts/` và ảnh tại `public/images/imported-posts/`. Trang bài viết ghép kho này với các bài được đăng qua quản trị và phân trang 20 bài/trang. Nội dung giữ tiêu đề, ngày đăng, phần giới thiệu và các đoạn, danh sách, định dạng của trang nguồn; mã thực thi của trang nguồn không được nhập.
 
 Nhập lại bằng `python scripts/import-source-posts.py` (cần `requests` và `beautifulsoup4`). Script dùng bộ nhớ đệm trong `tmp/source-posts/` để tiếp tục khi mất kết nối. Kiểm tra đối chiếu toàn bộ nội dung với HTML nguồn đã lưu bằng `python scripts/verify-source-posts.py`. Báo cáo số bài và ảnh nguồn không còn tồn tại nằm ở `public/imported-posts/import-report.json`.

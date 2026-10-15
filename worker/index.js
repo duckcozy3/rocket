@@ -741,6 +741,15 @@ async function remoteCtvRoute(request, env, pathname) {
     const { result } = await providerRequest(env, "/api/ctv/orders", { cookie });
     return json({ orders: portalOrders(result) });
   }
+  if (pathname === "/api/ctv/lookup" && method === "POST") {
+    const body = await readJson(request);
+    const username = normalizeUsername(body.username);
+    if (!username) throw httpError(400, "Tên người dùng Locket không hợp lệ.");
+    const { result } = await providerRequest(env, "/api/ctv/lookup", { method: "POST", body: { username }, cookie });
+    const user = unwrap(result);
+    if (!user.uid) throw httpError(404, "Không tìm thấy tài khoản Locket.");
+    return json({ user: { username, uid: user.uid, displayName: user.displayName || user.fullName || user.name || username } });
+  }
   if (pathname === "/api/ctv/orders" && method === "POST") {
     const body = await readJson(request);
     const username = normalizeUsername(body.username);

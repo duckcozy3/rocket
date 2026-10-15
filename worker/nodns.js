@@ -121,6 +121,6 @@ export function publicCtv(result) {
 export function portalOrders(result) {
   const data = unwrap(result);
   const orders = Array.isArray(data) ? data : data.orders || [];
-  return orders.map((order) => ({ code: order.code || order.id || order.orderId || "—", username: order.username || order.userUpgraded || order.displayName || order.userId || "—", plan_name: order.plan_name || order.packageId || "Gold", status: order.status || (order.gold?.active === true ? "completed" : "pending"), amount: Number(order.amount || order.price || 0) }));
+  return orders.map((order) => ({ code: order.code || order.id || order.orderId || "—", username: order.username || order.userUpgraded || order.displayName || order.userId || "—", plan_name: order.plan_name || order.packageId || "Gold", status: order.status || (order.gold?.active === true ? "completed" : "pending"), amount: Number(order.amount || order.price || 0), created_at: order.created_at || order.createdAt || null }));
 }
 function failure(status, message) { return Object.assign(new Error(message), { status, ...(status >= 500 ? { publicMessage: message } : {}) }); }

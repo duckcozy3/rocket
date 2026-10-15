@@ -1,4 +1,6 @@
 import "./styles.css";
+import "./ctv-portal.css";
+import { mountCtvPortal } from "./ctv-portal.js";
 import { orderCreatedLabel, visibleAdminOrder } from "./admin-orders.js";
 import { normalizeUsername, parsePastedUsername } from "./username.js";
 import { DEFAULT_PLANS as fallbackPlans } from "./plans.js";
@@ -588,55 +590,8 @@ async function renderCtv(user, remote = false) {
   document.querySelector("#ctv-login").hidden = true;
   const dashboard = document.querySelector("#ctv-dashboard");
   dashboard.hidden = false;
-  dashboard.innerHTML = `<div class="portal-head"><div><span class="eyebrow">CTV đang hoạt động</span><h2>Xin chào, ${escapeHtml(user.username)}</h2></div><button id="ctv-logout" class="button button--outline button--small">Đăng xuất</button></div><div class="metric-grid"><article><span>Số dư</span><strong id="ctv-balance">${money(user.balance)}</strong></article><article><span>Tổng đơn</span><strong id="ctv-order-count">${Number(user.order_count || 0)}</strong></article><article><span>Đơn hoàn tất</span><strong id="ctv-completed-count">${Number(user.completed_count || 0)}</strong></article></div><div class="ctv-grid"><form id="ctv-order-form" class="form-card"><h2>Tạo đơn CTV</h2><label>Gói<select name="plan_id">${fallbackPlans.map((plan) => `<option value="${plan.id}">${plan.platform} · ${plan.name} · ${money(plan.price)}</option>`).join("")}</select></label><label>Tên người dùng Locket<input name="username" required maxlength="64" autocomplete="off"></label><button class="button" type="submit">Tạo đơn từ số dư</button><p class="form-message" aria-live="polite"></p></form><section class="history-card"><h2>Lịch sử đơn</h2><div id="ctv-orders"><p>Đang tải…</p></div></section></div>`;
-  if (remote) {
-    dashboard.dataset.remote = "true";
-    dashboard.querySelector('.metric-grid article:nth-child(2) span').textContent = "Đơn trong lịch sử";
-    document.querySelector("#ctv-order-count").textContent = "—";
-    dashboard.querySelector('.metric-grid article:nth-child(3)').innerHTML = `<span>Lượt còn lại</span><strong id="ctv-completed-count">${Number(user.remaining || 0)}</strong>`;
-    const select = dashboard.querySelector('select[name="plan_id"]');
-    select.querySelector('option[value="android-lifetime"]')?.remove();
-    [...select.options].forEach((option) => {
-      const plan = fallbackPlans.find((item) => item.id === option.value);
-      option.textContent = `${plan.platform} · ${plan.name}`;
-    });
-    const submit = dashboard.querySelector('#ctv-order-form button[type="submit"]');
-    submit.textContent = "Cấp Gold bằng lượt NoDNS";
-    const hint = document.createElement("p");
-    hint.textContent = "Tài khoản và lượt được quản lý tại NoDNS. Gói vĩnh viễn có thể trừ 2 lượt theo cấu hình nhà cung cấp.";
-    submit.before(hint);
-  }
-  document.querySelector("#ctv-logout").addEventListener("click", async () => { await api("/api/ctv/logout", { method: "POST" }); location.reload(); });
-  document.querySelector("#ctv-order-form").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const orderForm = event.currentTarget;
-    const message = orderForm.querySelector(".form-message");
-    const submit = orderForm.querySelector('button[type="submit"]');
-    if (submit.disabled) return;
-    submit.disabled = true;
-    try {
-      const result = await api("/api/ctv/orders", { method: "POST", body: JSON.stringify(Object.fromEntries(new FormData(orderForm))) });
-      message.textContent = `${result.message} Mã: ${result.code}`;
-      message.className = "form-message is-success";
-      orderForm.reset();
-      const [{ user: freshUser }] = await Promise.all([api("/api/ctv/me"), loadCtvOrders()]);
-      document.querySelector("#ctv-balance").textContent = money(freshUser.balance);
-      if (!remote) document.querySelector("#ctv-order-count").textContent = freshUser.order_count;
-      document.querySelector("#ctv-completed-count").textContent = remote ? freshUser.remaining : freshUser.completed_count;
-    } catch (error) { message.textContent = error.message; message.className = "form-message is-error"; }
-    finally { submit.disabled = false; }
-  });
-  loadCtvOrders();
-}
-
-async function loadCtvOrders() {
-  const target = document.querySelector("#ctv-orders");
-  if (!target) return;
-  try {
-    const { orders } = await api("/api/ctv/orders");
-    if (document.querySelector("#ctv-dashboard")?.dataset.remote === "true") document.querySelector("#ctv-order-count").textContent = orders.length;
-    target.innerHTML = orders.length ? `<div class="table-wrap"><table><thead><tr><th>Mã</th><th>Thời gian đặt (giờ VN)</th><th>Tên người dùng</th><th>Gói</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${orders.map((order) => `<tr><td>${escapeHtml(order.code)}</td><td>${escapeHtml(orderCreatedLabel(order.created_at))}</td><td>${escapeHtml(order.username)}</td><td>${escapeHtml(planNameLabel(order.plan_name))}</td><td><span class="status status--${escapeHtml(order.status)}">${escapeHtml(orderStatusLabel(order.status))}</span></td><td><button type="button" class="button button--small button--outline" data-delete-order="${escapeHtml(order.code)}">Xoá</button></td></tr>`).join("")}</tbody></table></div>` : "<p>Chưa có đơn nào.</p>";
-  } catch (error) { target.innerHTML = `<p>${escapeHtml(error.message)}</p>`; }
+  dashboard.className = "ctvp";
+  await mountCtvPortal(dashboard, user, remote, { api, escapeHtml, money, plans: fallbackPlans, orderStatusLabel, planNameLabel });
 }
 
 function initAdmin() {
