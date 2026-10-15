@@ -28,7 +28,7 @@ export default {
     try {
       if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: securityHeaders() });
       if (request.method !== "GET" && url.pathname !== "/api/sepay/webhook") assertSameOrigin(request, env);
-      if (["/api/public-config", "/api/sepay/webhook", "/api/ctv/orders", "/api/admin/provider", "/api/admin/gold/cancel"].includes(url.pathname)) {
+      if (["/api/public-config", "/api/sepay/webhook", "/api/ctv/orders", "/api/ctv/local/orders", "/api/admin/provider", "/api/admin/gold/cancel"].includes(url.pathname)) {
         if (url.pathname.startsWith("/api/admin/")) await requireSession(request, env, "admin");
         env = await resolveNoDnsEnv(env);
       }
@@ -44,6 +44,12 @@ export default {
 
 async function route(request, env, ctx, url) {
   const { pathname } = url;
+  // Accounts created in this site's admin always use D1, regardless of legacy NoDNS mode.
+  if (pathname.startsWith("/api/ctv/local/")) {
+    const localUrl = new URL(url);
+    localUrl.pathname = pathname.replace("/api/ctv/local/", "/api/ctv/");
+    return route(request, { ...env, NODNS_CTV_PORTAL: "false" }, ctx, localUrl);
+  }
   if (pathname === "/api/locket/userinfo" && request.method === "GET") {
     rateLimit(request, "lookup", 30, 60_000);
     const username = normalizeUsername(url.searchParams.get("user"));

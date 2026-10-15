@@ -9,7 +9,8 @@ test("local CTV management creates protected accounts, sets individual prices, d
   try {
     const directory = new URL("../migrations/", import.meta.url);
     for (const file of (await readdir(directory)).filter((name) => name.endsWith(".sql")).sort()) sqlite.exec(await readFile(new URL(file, directory), "utf8"));
-    const env = { NODNS_CTV_PORTAL: "false", SESSION_SECRET: "ctv-local-management-secret", ADMIN_PASSWORD_SHA256: "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918", DB: {
+    // Local portal must remain usable even if a deployed environment still enables legacy NoDNS mode.
+    const env = { NODNS_CTV_PORTAL: "true", SESSION_SECRET: "ctv-local-management-secret", ADMIN_PASSWORD_SHA256: "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918", DB: {
       prepare(sql) {
         let values = [];
         return {
@@ -27,7 +28,7 @@ test("local CTV management creates protected accounts, sets individual prices, d
     } };
     const site = "https://locketgold.info";
     const tasks = [];
-    const call = (path, cookie = "", body, origin = site) => worker.fetch(new Request(site + path, {
+    const call = (path, cookie = "", body, origin = site) => worker.fetch(new Request(site + path.replace(/^\/api\/ctv\//, "/api/ctv/local/"), {
       method: body === undefined ? "GET" : "POST", headers: { Cookie: cookie, Origin: origin, "Content-Type": "application/json" },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     }), env, { waitUntil(task) { tasks.push(task); } });
@@ -50,6 +51,10 @@ test("local CTV management creates protected accounts, sets individual prices, d
     assert.equal(ctvLogin.status, 200);
     const ctv = ctvLogin.headers.get("Set-Cookie").split(";")[0];
     const account = (await ctvLogin.json()).user;
+    assert.equal((await call("/api/ctv/login", "", { username: "alice", password: "wrong-password" })).status, 401);
+    const restored = await call("/api/ctv/me", ctv);
+    assert.equal(restored.status, 200);
+    assert.equal((await restored.json()).user.username, "alice");
     assert.equal(account.plans.find((plan) => plan.id === "ios-month").price, 15000);
     assert.equal((await call("/api/admin/ctv", ctv)).status, 401);
     assert.equal((await call("/api/ctv/orders", ctv, { username: "customer", plan_id: "ios-month", price: 1 })).status, 201);
@@ -71,5 +76,8 @@ test("local CTV management creates protected accounts, sets individual prices, d
     assert.equal(sqlite.prepare("SELECT amount FROM orders ORDER BY id DESC LIMIT 1").get().amount, 0);
     assert.equal(sqlite.prepare("SELECT amount FROM orders ORDER BY id LIMIT 1").get().amount, 15000);
     assert.equal((await call("/api/admin/ctv/prices", admin, { id: 999, prices: {} })).status, 404);
+    const logout = await call("/api/ctv/logout", ctv, {});
+    assert.equal(logout.status, 200);
+    assert.match(logout.headers.get("Set-Cookie"), /lg_ctv=;.*Max-Age=0/);
   } finally { sqlite.close(); }
 });

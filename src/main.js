@@ -572,19 +572,30 @@ async function checkOrder(code) {
   }
 }
 
+function localCtvApi(path, options) {
+  return api(path.replace(/^\/api\/ctv\//, "/api/ctv/local/"), options);
+}
+
 function initCtv() {
   const form = document.querySelector("#ctv-login");
   if (!form) return;
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const message = document.querySelector("#ctv-message");
+    const button = form.querySelector('[type="submit"]');
+    if (button.disabled) return;
+    button.disabled = true;
+    message.textContent = "Đang đăng nhập…";
+    message.className = "form-message";
     try {
-      const result = await api("/api/ctv/login", { method: "POST", body: JSON.stringify(Object.fromEntries(new FormData(form))) });
-      const account = result.user ? result : await api("/api/ctv/me");
+      const result = await localCtvApi("/api/ctv/login", { method: "POST", body: JSON.stringify(Object.fromEntries(new FormData(form))) });
+      const account = result.user ? result : await localCtvApi("/api/ctv/me");
       await renderCtv(account.user, account.remote);
+      form.elements.password.value = "";
     } catch (error) { message.textContent = error.message; message.className = "form-message is-error"; }
+    finally { button.disabled = false; }
   });
-  api("/api/ctv/me").then(({ user, remote }) => renderCtv(user, remote)).catch(() => {});
+  localCtvApi("/api/ctv/me").then(({ user, remote }) => renderCtv(user, remote)).catch(() => {});
 }
 
 async function renderCtv(user, remote = false) {
@@ -592,7 +603,7 @@ async function renderCtv(user, remote = false) {
   const dashboard = document.querySelector("#ctv-dashboard");
   dashboard.hidden = false;
   dashboard.className = "ctvp";
-  await mountCtvPortal(dashboard, user, remote, { api, escapeHtml, money, plans: user.plans || fallbackPlans, orderStatusLabel, planNameLabel });
+  await mountCtvPortal(dashboard, user, remote, { api: localCtvApi, escapeHtml, money, plans: user.plans || fallbackPlans, orderStatusLabel, planNameLabel });
 }
 
 function initAdmin() {
