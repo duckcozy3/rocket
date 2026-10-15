@@ -64,6 +64,30 @@ test("archive failure returns a retryable error instead of an incomplete success
   assert.equal(response.headers.get("Retry-After"), "60");
 });
 
+test("database failure serves the generated static sitemap for GET and HEAD", async () => {
+  const xml = sitemapXml(FALLBACK_POSTS);
+  for (const method of ["GET", "HEAD"]) {
+    const response = await worker.fetch(request(method), {
+      DB: { prepare() { throw new Error("D1 unavailable"); } },
+      ASSETS: { async fetch(req) {
+        return new URL(req.url).pathname === "/sitemap-static.xml"
+          ? new Response(xml, { headers: { "Content-Type": "application/xml" } })
+          : Response.json([]);
+      } },
+    }, {});
+    assert.equal(response.status, 200);
+    assert.equal(await response.text(), method === "HEAD" ? "" : xml);
+    assert.equal(response.headers.get("Cache-Control"), "public, max-age=60");
+  }
+});
+
+test("sitemap fallback rejects an HTML error page returned with HTTP 200", async () => {
+  const response = await worker.fetch(request(), { ASSETS: { async fetch() {
+    return new Response("<html>Error</html>", { headers: { "Content-Type": "text/html" } });
+  } } }, {});
+  assert.equal(response.status, 503);
+});
+
 test("unknown article URLs return 404 and noindex", async () => {
   const response = await worker.fetch(new Request("https://locketgold.info/bai-viet/?bai=missing"), { ASSETS: { async fetch(req) {
     return new URL(req.url).pathname === "/bai-viet/"
