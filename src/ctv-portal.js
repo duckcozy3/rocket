@@ -20,7 +20,7 @@ export function ctvProfileMarkup(profile, requestedUsername, esc) {
 }
 
 export function ctvPortalMarkup(user, remote, { escapeHtml: esc, money, plans }) {
-  const options = plans.filter((plan) => !remote || plan.platform === "iOS");
+  const options = plans.filter((plan) => plan.platform === "iOS");
   return `<aside class="ctvp-sidebar"><a class="ctvp-brand" href="/"><span>${icon("crown")}</span><div><strong>Portal CTV</strong><small>Locket Gold · locketgold.info</small></div></a>
     <div class="ctvp-account"><div class="ctvp-identity"><b>${esc((user.username || "C").slice(0, 1).toUpperCase())}</b><div><strong>${esc(user.username)}</strong><small>@${esc(user.username)}</small></div></div><div class="ctvp-mini"><div><small>SỐ DƯ</small><strong data-ctv-balance>${money(user.balance)}</strong></div><div><small>${remote ? "LƯỢT" : "ĐƠN"}</small><strong data-ctv-quota>${Number(remote ? user.remaining || 0 : user.order_count || 0)}</strong></div></div></div>
     <nav aria-label="Cộng tác viên">${nav.map(([id, symbol, title]) => `<button type="button" data-ctv-nav="${id}" class="${id === "activate" ? "is-active" : ""}">${icon(symbol)}${title}</button>`).join("")}</nav><button type="button" class="ctvp-logout" id="ctv-logout">${icon("logout")}Đăng Xuất</button></aside>

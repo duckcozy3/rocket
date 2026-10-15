@@ -50,6 +50,7 @@ test("local CTV management creates protected accounts, sets individual prices, d
     assert.equal((await call("/api/admin/ctv", admin, { username: "bob", password: "password-for-bob", initial_balance: 50000, prices: {} })).status, 201);
     const list = await (await call("/api/admin/ctv", admin)).json();
     assert.deepEqual(list.stats, { count: 2, sold_orders: 0, balance: 150000 });
+    assert.ok(list.plans.every((plan) => plan.platform === "iOS"));
     assert.equal(list.ctv[0].prices["ios-month"], 15000);
     assert.ok(!JSON.stringify(list).includes("password"));
     const saved = sqlite.prepare("SELECT password_hash FROM ctv_users WHERE username = 'alice'").get();
@@ -64,6 +65,8 @@ test("local CTV management creates protected accounts, sets individual prices, d
     assert.equal(restored.status, 200);
     assert.equal((await restored.json()).user.username, "alice");
     assert.equal(account.plans.find((plan) => plan.id === "ios-month").price, 15000);
+    assert.ok(account.plans.every((plan) => plan.platform === "iOS"));
+    assert.equal((await call("/api/ctv/orders", ctv, { username: "customer", plan_id: "android-lifetime" })).status, 400);
     assert.equal((await call("/api/admin/ctv", ctv)).status, 401);
     assert.equal((await call("/api/ctv/orders", ctv, { username: "customer", plan_id: "ios-month", price: 1 })).status, 201);
     await Promise.all(tasks.splice(0));

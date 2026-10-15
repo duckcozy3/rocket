@@ -21,7 +21,7 @@ export function addAdminCtv(dash, api, { escapeHtml: esc, money }) {
     const notice = panel.querySelector("#admin-ctv-message");
     try {
       const data = await api("/api/admin/ctv");
-      accounts = data.ctv; plans = data.plans;
+      accounts = data.ctv; plans = data.plans.filter((plan) => plan.platform === "iOS");
       panel.querySelectorAll("[data-ctv-stat]").forEach((node) => { node.textContent = node.dataset.ctvStat === "balance" ? money(data.stats.balance) : Number(data.stats[node.dataset.ctvStat] || 0); });
       panel.querySelector("#admin-ctv-list").innerHTML = accounts.length ? `<div class="table-wrap"><table><thead><tr><th>STT</th><th>Tài khoản CTV</th><th>Đơn đã bán</th><th>Số dư ví</th><th>Giá bán CTV</th><th>Thao tác</th></tr></thead><tbody>${accounts.map((user, index) => `<tr><td>${index + 1}</td><td>${esc(user.username)}</td><td>${user.sold_orders}</td><td>${money(user.balance)}</td><td>${plans.map((plan) => `<div>${esc(plan.platform)} · ${esc(plan.name)}: <b>${money(user.prices[plan.id] ?? plan.price)}</b>${user.prices[plan.id] == null ? " (giá chung)" : ""}</div>`).join("")}</td><td><button type="button" class="button button--small button--outline" data-edit-ctv="${user.id}">Chỉnh giá</button><button type="button" class="button button--small button--outline" data-wallet-ctv="${user.id}">Số dư</button></td></tr>`).join("")}</tbody></table></div>` : "<p>Chưa có cộng tác viên. Tạo tài khoản đầu tiên bên dưới.</p>";
       const selected = edit.elements.id.value;

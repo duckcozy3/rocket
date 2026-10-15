@@ -678,7 +678,7 @@ async function adminListCtv(request, env) {
   const { plans } = await plansResponse.json();
   const prices = new Map((stored || []).map((row) => [row.key, validateCtvPrices(JSON.parse(row.value))]));
   const ctv = (users || []).map((user) => ({ ...user, balance: Number(user.balance), sold_orders: Number(user.sold_orders), prices: prices.get(`ctv_prices:${user.id}`) || {} }));
-  return json({ ctv, plans, stats: { count: ctv.length, sold_orders: ctv.reduce((total, user) => total + user.sold_orders, 0), balance: ctv.reduce((total, user) => total + user.balance, 0) } });
+  return json({ ctv, plans: plans.filter((plan) => plan.platform === "iOS"), stats: { count: ctv.length, sold_orders: ctv.reduce((total, user) => total + user.sold_orders, 0), balance: ctv.reduce((total, user) => total + user.balance, 0) } });
 }
 
 async function adminCtvPrices(request, env) {
@@ -741,7 +741,7 @@ async function ctvCreateOrder(request, env, ctx) {
   const body = await readJson(request);
   const username = normalizeUsername(body.username);
   const originalPlan = await findPlan(env, body.plan_id);
-  if (!username || !originalPlan) throw httpError(400, "Tên người dùng hoặc gói chưa hợp lệ.");
+  if (!username || !originalPlan || originalPlan.platform !== "iOS") throw httpError(400, "CTV chỉ hỗ trợ các gói Locket Gold iOS.");
   const plan = { ...originalPlan };
   const user = await env.DB.prepare("SELECT id, username, balance FROM ctv_users WHERE id = ? AND active = 1").bind(Number(session.sub)).first();
   if (!user) throw httpError(401, "Tài khoản không còn hoạt động.");
@@ -762,7 +762,7 @@ async function ctvPublicUser(env, user) {
   const totals = await env.DB.prepare("SELECT COUNT(*) order_count, SUM(CASE WHEN status IN ('paid','completed') THEN 1 ELSE 0 END) completed_count FROM orders WHERE ctv_id = ?").bind(user.id).first();
   const prices = await ctvPrices(env, user.id);
   const { plans } = await (await getPlans(env)).json();
-  return { username: user.username, balance: Number(user.balance || 0), order_count: Number(totals?.order_count || 0), completed_count: Number(totals?.completed_count || 0), plans: plans.map((plan) => ({ ...plan, price: prices[plan.id] ?? plan.price })) };
+  return { username: user.username, balance: Number(user.balance || 0), order_count: Number(totals?.order_count || 0), completed_count: Number(totals?.completed_count || 0), plans: plans.filter((plan) => plan.platform === "iOS").map((plan) => ({ ...plan, price: prices[plan.id] ?? plan.price })) };
 }
 
 async function findPlan(env, id) {
