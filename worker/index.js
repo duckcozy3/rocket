@@ -401,15 +401,36 @@ async function adminOverview(request, env) {
 async function adminOrders(request, env) {
   await requireSession(request, env, "admin"); requireDb(env);
   await expirePendingOrders(env);
-  const { results } = await env.DB.prepare("SELECT code, username, contact, plan_name, amount, status, expires_at, expired_at, gold_revoked_at, created_at FROM orders WHERE expired_at IS NULL AND admin_deleted_at IS NULL ORDER BY created_at DESC LIMIT 100").all();
+  const base = "SELECT code, username, contact, plan_name, amount, status, expires_at, expired_at, gold_revoked_at, created_at FROM orders WHERE expired_at IS NULL";
+  const suffix = " AND NOT EXISTS (SELECT 1 FROM settings WHERE key = 'admin_deleted_order:' || orders.code) ORDER BY created_at DESC LIMIT 100";
+  let data;
+  try {
+    data = await env.DB.prepare(`${base} AND admin_deleted_at IS NULL${suffix}`).all();
+  } catch (error) {
+    if (!missingAdminDeletedColumn(error)) throw error;
+    // Existing production databases may not have migration 0011 yet.
+    data = await env.DB.prepare(`${base}${suffix}`).all();
+  }
+  const { results } = data;
   return json({ orders: results || [] });
 }
 
 async function adminDeleteOrder(request, env, code) {
   await requireSession(request, env, "admin"); requireDb(env);
-  const result = await env.DB.prepare("UPDATE orders SET admin_deleted_at = CURRENT_TIMESTAMP WHERE code = ? AND admin_deleted_at IS NULL").bind(code).run();
+  let result;
+  try {
+    result = await env.DB.prepare("UPDATE orders SET admin_deleted_at = CURRENT_TIMESTAMP WHERE code = ? AND admin_deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM settings WHERE key = 'admin_deleted_order:' || orders.code)").bind(code).run();
+  } catch (error) {
+    if (!missingAdminDeletedColumn(error)) throw error;
+    // Use the existing settings table to hide the order without changing its payment data.
+    result = await env.DB.prepare("INSERT OR IGNORE INTO settings (key, value) SELECT 'admin_deleted_order:' || code, CURRENT_TIMESTAMP FROM orders WHERE code = ?").bind(code).run();
+  }
   if (!result.meta?.changes) throw httpError(404, "Không tìm thấy đơn hàng.");
   return json({ message: "Đã xoá đơn khỏi danh sách quản trị." });
+}
+
+function missingAdminDeletedColumn(error) {
+  return /no such column:\s*(?:orders\.)?admin_deleted_at\b/i.test(String(error?.message || ""));
 }
 
 async function adminProviderKey(request, env) {

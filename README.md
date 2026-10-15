@@ -6,7 +6,7 @@ Website nhiều trang cho `locketgold.info`, gồm giao diện bán gói, tải 
 
 Danh sách đơn quản trị hiển thị thời gian đặt theo giờ Việt Nam và tự cập nhật mỗi 10 giây khi đang mở. Đơn hết hạn thanh toán tự ẩn. Nút **Xoá** yêu cầu xác nhận và chỉ xoá đơn khỏi danh sách quản trị; dữ liệu đơn và lịch sử thanh toán vẫn được giữ để đối soát. Thao tác này không huỷ quyền Gold hoặc hoàn tiền.
 
-Trước khi triển khai phiên bản có chức năng xoá đơn, áp dụng migration `0011_admin_order_deletion.sql`:
+Chức năng danh sách và xoá đơn hỗ trợ cả cơ sở dữ liệu chưa có migration `0011_admin_order_deletion.sql`: khi thiếu cột `admin_deleted_at`, dấu xoá được lưu trong bảng `settings` hiện có. Đơn đã xoá vẫn được giữ ẩn sau khi áp dụng migration. Có thể cập nhật schema theo quy trình thông thường:
 
 ```powershell
 npx wrangler d1 migrations apply locketgold-db --remote
