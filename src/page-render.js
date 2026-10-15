@@ -187,7 +187,7 @@ export function createPageRenderer(page, search = "") {
   }
 
   function ctvPage() {
-    return publicShell(`${pageHero("Cộng tác viên", "Quản lý đơn gọn trong một nơi", "Đăng nhập tài khoản do quản trị viên cấp để xem số dư và tạo đơn CTV.")}<section class="section section--compact"><div class="container portal-wrap"><form id="ctv-login" method="post" class="form-card form-card--narrow"><h2>Đăng nhập CTV</h2><p>Dùng tên đăng nhập và mật khẩu CTV do quản trị viên locketgold.info cấp.</p><label>Tên đăng nhập<input name="username" autocomplete="username" required></label><label>Mật khẩu<input name="password" type="password" autocomplete="current-password" required></label><button class="button" type="submit">Đăng nhập</button><p id="ctv-message" class="form-message" aria-live="polite"></p></form><div id="ctv-dashboard" class="portal-dashboard" hidden></div></div></section>`);
+    return publicShell(`${pageHero("Cộng tác viên", "Quản lý đơn gọn trong một nơi", "Đăng nhập tài khoản do quản trị viên cấp để xem số dư và tạo đơn CTV.")}<section class="section section--compact"><div class="container portal-wrap"><form id="ctv-login" method="post" class="form-card form-card--narrow"><h2>Đăng nhập CTV</h2><label>Tên đăng nhập<input name="username" autocomplete="username" required></label><label>Mật khẩu<input name="password" type="password" autocomplete="current-password" required></label><button class="button" type="submit">Đăng nhập</button><p id="ctv-message" class="form-message" aria-live="polite"></p></form><div id="ctv-dashboard" class="portal-dashboard" hidden></div></div></section>`);
   }
 
   function adminPage() {
