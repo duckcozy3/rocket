@@ -2,12 +2,14 @@ import { ctvCredits } from "./ctv-pricing.js";
 import { mountCtvDeposit } from "./ctv-deposit.js";
 import { mountCtvBuyCredits } from "./ctv-buy-credits.js";
 import { mountCtvGuide } from "./ctv-guide.js";
+import { mountCtvPassword } from "./ctv-password.js";
 import { parsePastedUsername } from "./username.js";
 import { orderCreatedLabel } from "./admin-orders.js";
 
 const paths = { crown: 'm3 7 4 4 5-7 5 7 4-4-2 13H5Z', bolt: 'm13 2-9 12h7l-1 8 10-13h-7Z', wallet: 'M3 6h17v15H3ZM3 6V3h14v3M15 12h5v4h-5Z', cart: 'M2 3h3l3 13h11l3-9H6M9 21h1m8 0h1', book: 'M12 5C8 2 3 3 3 3v16s5-1 9 2c4-3 9-2 9-2V3s-5-1-9 2Zm0 0v16', history: 'M3 11a9 9 0 1 1 2 7M3 3v8h8m1-5v6l4 3', key: 'M14 13a6 6 0 1 0-3-3L2 19v3h4v-3h3v-3Z', logout: 'M9 3H3v18h6m6-14 5 5-5 5M8 12h12', refresh: 'M20 7a9 9 0 0 0-15-2L2 8m0-6v6h6m-4 9a9 9 0 0 0 15 2l3-3m0 6v-6h-6', search: 'M21 21l-6-6M17 9a8 8 0 1 1-16 0 8 8 0 0 1 16 0', plane: 'm2 12 20-9-9 19-3-9Z', star: 'm12 2 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1Z' };
 const icon = (name) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"> <path d="${paths[name] || paths.bolt}"/></svg>`;
 const nav = [["activate", "bolt", "Kích Hoạt Gold"], ["deposit", "wallet", "Nạp Tiền"], ["credits", "cart", "Mua Lượt"], ["guide", "book", "Hướng Dẫn"], ["history", "history", "Lịch Sử Đơn"]];
+nav.push(["password", "key", "Đổi mật khẩu"]);
 
 export function ctvProfileMarkup(profile, requestedUsername, esc) {
   const username = profile.username || requestedUsername;
@@ -144,6 +146,12 @@ export async function mountCtvPortal(root, user, remote, helpers) {
     const isBuy = !remote && id === "credits";
     const isDeposit = !remote && id === "deposit";
     const isGuide = id === "guide";
+    if (id === "password") {
+      root.querySelector(".ctvp-metrics").hidden = true;
+      root.querySelector('[data-ctv-panel="secondary"]').className = "ctvp-card";
+      disposeDeposit = mountCtvPassword(root.querySelector("#ctvp-secondary"), api);
+      return;
+    }
     root.querySelector(".ctvp-metrics").hidden = isDeposit || isBuy || isGuide;
     root.querySelector('[data-ctv-panel="secondary"]').className = isDeposit || isBuy || isGuide ? "ctvp-topup-host" : "ctvp-card";
     if (isGuide) {

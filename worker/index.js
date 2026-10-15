@@ -129,6 +129,7 @@ async function route(request, env, ctx, url) {
   }
 
   if (pathname === "/api/ctv/login" && request.method === "POST") return ctvLogin(request, env);
+  if (pathname === "/api/ctv/password" && request.method === "POST") return ctvChangePassword(request, env);
   if (pathname === "/api/ctv/credits/buy" && request.method === "POST") {
     requireDb(env);
     const session = await requireSession(request, env, "ctv");
@@ -679,11 +680,12 @@ async function adminCreateCtv(request, env) {
   if (!/^[a-z0-9_.-]{3,50}$/.test(username) || password.length < 10 || password.length > 1000) throw httpError(400, "Tên đăng nhập cần 3–50 ký tự chữ, số, dấu chấm, gạch dưới hoặc gạch ngang; mật khẩu cần 10–1000 ký tự.");
   if (!Number.isSafeInteger(initialBalance) || initialBalance < 0 || initialBalance > 1_000_000_000) throw httpError(400, "Số dư ban đầu không hợp lệ.");
   const prices = validateCtvPrices(body.unit_price !== undefined ? { unit_price: body.unit_price } : body.prices || {});
-  if (await env.DB.prepare("SELECT id FROM ctv_users WHERE username = ? COLLATE NOCASE").bind(username).first()) throw httpError(409, "Tên tài khoản CTV đã tồn tại.");
+  if (await env.DB.prepare("SELECT id FROM ctv_users WHERE username = ? COLLATE NOCASE AND active = 1").bind(username).first()) throw httpError(409, "Tên tài khoản CTV đã tồn tại.");
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const passwordHash = `pbkdf2-sha256$100000$${await pbkdf2(password, salt)}`;
   try {
     await env.DB.batch([
+      env.DB.prepare("UPDATE ctv_users SET username = username || ':deleted:' || id || ':' || ? WHERE username = ? COLLATE NOCASE AND active = 0").bind(crypto.randomUUID(), username),
       env.DB.prepare("INSERT INTO ctv_users (username, password_hash, password_salt, balance, active) VALUES (?, ?, ?, ?, 1)").bind(username, passwordHash, toBase64Url(salt), initialBalance),
       env.DB.prepare("INSERT INTO settings (key, value) SELECT 'ctv_prices:' || id, ? FROM ctv_users WHERE username = ? COLLATE NOCASE").bind(JSON.stringify(prices), username),
     ]);
@@ -765,9 +767,27 @@ async function ctvLogin(request, env) {
     const updatedHash = `pbkdf2-sha256$100000$${await pbkdf2(password, fromBase64Url(user.password_salt))}`;
     await env.DB.prepare("UPDATE ctv_users SET password_hash = ? WHERE id = ? AND password_hash = ?").bind(updatedHash, user.id, user.password_hash).run();
   }
-  const token = await signSession({ role: "ctv", sub: String(user.id), exp: Date.now() + 12 * 60 * 60_000 }, env.SESSION_SECRET);
+  const token = await signSession({ role: "ctv", sub: String(user.id), revision: user.password_salt, exp: Date.now() + 12 * 60 * 60_000 }, env.SESSION_SECRET);
   const response = json({ user: await ctvPublicUser(env, user) });
   return withCookie(response, `lg_ctv=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=43200`);
+}
+
+async function ctvChangePassword(request, env) {
+  const session = await requireSession(request, env, "ctv");
+  rateLimit(request, `ctv-password:${session.sub}`, 6, 15 * 60_000);
+  const body = await readJson(request);
+  const { current_password: current, new_password: password, confirm_password: confirmation } = body;
+  if (typeof current !== "string" || !current || current.length > 1000 || typeof password !== "string" || password.length < 10 || password.length > 1000) throw httpError(400, "Mật khẩu mới cần 10–1000 ký tự.");
+  if (password !== confirmation) throw httpError(400, "Xác nhận mật khẩu không khớp.");
+  const user = await env.DB.prepare("SELECT id, password_hash, password_salt FROM ctv_users WHERE id = ? AND active = 1").bind(Number(session.sub)).first();
+  if (!user || !(await verifyCtvPassword(current, user))) throw httpError(401, "Mật khẩu hiện tại không đúng.");
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const revision = toBase64Url(salt);
+  const hash = `pbkdf2-sha256$100000$${await pbkdf2(password, salt)}`;
+  const result = await env.DB.prepare("UPDATE ctv_users SET password_hash = ?, password_salt = ? WHERE id = ? AND active = 1 AND password_hash = ? AND password_salt = ?").bind(hash, revision, user.id, user.password_hash, user.password_salt).run();
+  if (!result.meta?.changes) throw httpError(409, "Tài khoản đã thay đổi. Vui lòng đăng nhập lại.");
+  const token = await signSession({ role: "ctv", sub: String(user.id), revision, exp: Date.now() + 12 * 60 * 60_000 }, env.SESSION_SECRET);
+  return withCookie(json({ message: "Đã đổi mật khẩu. Các phiên đăng nhập khác đã được đăng xuất." }), `lg_ctv=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=43200`);
 }
 
 async function ctvMe(request, env) {
@@ -868,8 +888,9 @@ async function requireSession(request, env, role) {
   }
   if (role === "ctv") {
     requireDb(env);
-    const user = await env.DB.prepare("SELECT id FROM ctv_users WHERE id = ? AND active = 1").bind(Number(payload.sub)).first();
+    const user = await env.DB.prepare("SELECT id, password_salt FROM ctv_users WHERE id = ? AND active = 1").bind(Number(payload.sub)).first();
     if (!user) throw httpError(401, "Tài khoản CTV đã bị vô hiệu hoá.");
+    if (payload.revision !== user.password_salt) throw httpError(401, "Mật khẩu hoặc phiên đăng nhập đã thay đổi. Vui lòng đăng nhập lại.");
   }
   return payload;
 }
