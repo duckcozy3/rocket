@@ -1,4 +1,5 @@
 import { ctvCredits } from "./ctv-pricing.js";
+import { mountCtvDeposit } from "./ctv-deposit.js";
 import { parsePastedUsername } from "./username.js";
 import { orderCreatedLabel } from "./admin-orders.js";
 
@@ -127,7 +128,10 @@ export async function mountCtvPortal(root, user, remote, helpers) {
     catch (error) { showMessage(error.message, true); }
     finally { button.disabled = false; }
   });
+  let disposeDeposit;
   const activatePanel = (id) => {
+    disposeDeposit?.();
+    disposeDeposit = null;
     root.querySelectorAll("[data-ctv-nav]").forEach((button) => { const selected = button.dataset.ctvNav === id; button.classList.toggle("is-active", selected); button.setAttribute("aria-current", selected ? "page" : "false"); });
     root.querySelector("#ctv-section-title").textContent = nav.find(([key]) => key === id)?.[2] || "Kích Hoạt Gold";
     const primary = id === "activate" || id === "history";
@@ -135,6 +139,13 @@ export async function mountCtvPortal(root, user, remote, helpers) {
     root.querySelector(".ctvp-left").hidden = id === "history";
     root.querySelector(".ctvp-columns").classList.toggle("is-history", id === "history");
     root.querySelector('[data-ctv-panel="secondary"]').hidden = primary;
+    const isDeposit = !remote && (id === "deposit" || id === "credits");
+    root.querySelector(".ctvp-metrics").hidden = isDeposit;
+    root.querySelector('[data-ctv-panel="secondary"]').className = isDeposit ? "ctvp-topup-host" : "ctvp-card";
+    if (isDeposit) {
+      disposeDeposit = mountCtvDeposit(root.querySelector("#ctvp-secondary"), user, { api, escapeHtml: esc, money }, refresh);
+      return;
+    }
     if (id === "history") refresh();
     const titles = { deposit: "Nạp tiền vào ví", credits: "Mua lượt kích hoạt", guide: "Hướng dẫn cộng tác viên", settings: "Tài khoản & cài đặt" };
     root.querySelector("#ctvp-secondary").innerHTML = id === "guide" ? `<h2>Hướng dẫn cộng tác viên</h2><ol><li>Dán username hoặc link hồ sơ Locket của khách.</li><li>Nhấn Tìm để kiểm tra thông tin.</li><li>Chọn thời hạn, nhấn Lên Gold và xác nhận.</li><li>Nhấn làm mới danh sách để kiểm tra trạng thái.</li></ol><a class="ctvp-link" href="/huong-dan/">Xem hướng dẫn sử dụng ↗</a>` : `<h2>${titles[id] || "Tài khoản"}</h2><p class="ctvp-muted">${id === "settings" ? `Đăng nhập với tài khoản @${esc(user.username)}. Quản lý API và tài khoản tại cổng NoDNS.` : remote ? "Nạp tiền và mua lượt cho tài khoản của bạn tại cổng NoDNS, sau đó quay lại làm mới số dư." : "Liên hệ quản trị viên để nạp số dư tài khoản cộng tác viên."}</p>${remote ? '<a class="ctvp-primary ctvp-link" href="https://ctv.nodns.vn" target="_blank" rel="noopener">Mở cổng NoDNS ↗</a>' : '<a class="ctvp-primary ctvp-link" href="/lien-he/">Liên hệ hỗ trợ ↗</a>'}<button class="ctvp-manage" type="button" id="ctvp-account-refresh">Làm mới tài khoản</button>`;

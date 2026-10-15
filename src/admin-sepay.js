@@ -1,4 +1,6 @@
 const outcomes = {
+  ctv_topup_credited: "Đã cộng ví CTV", ctv_topup_wrong_amount: "Nạp CTV sai số tiền · cần đối soát", ctv_topup_not_found: "Không tìm thấy mã nạp CTV", ctv_topup_already_paid: "Yêu cầu nạp CTV đã xử lý",
+  ctv_topup_ambiguous: "Nhiều mã nạp CTV · cần đối soát", ctv_account_inactive: "Tài khoản CTV không hoạt động",
   matched: "Đã khớp thanh toán", underpaid: "Thiếu tiền", no_order_code: "Không có mã đơn",
   order_not_found: "Không tìm thấy đơn", wrong_account: "Sai tài khoản nhận", outgoing: "Tiền ra",
   order_not_pending: "Đơn đã xử lý / đã hủy", legacy: "Bản ghi cũ", received: "Đang xử lý",

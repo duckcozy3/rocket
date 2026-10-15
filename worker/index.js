@@ -1,5 +1,6 @@
 import { normalizeUsername } from "../src/username.js";
 import { ctvCredits, ctvUnitPrice } from "../src/ctv-pricing.js";
+import { createCtvTopup, readCtvTopup, creditCtvTopup } from "./ctv-topups.js";
 import { DEFAULT_PLANS } from "../src/plans.js";
 import { activationConfirmed } from "./activation.js";
 import { adminCredential, passwordHash, verifyAdminPassword } from "./admin-account.js";
@@ -116,6 +117,22 @@ async function route(request, env, ctx, url) {
   if (pathname === "/api/admin/ctv/balance" && request.method === "POST") return adminUpdateCtvBalance(request, env);
 
   if (pathname === "/api/ctv/login" && request.method === "POST") return ctvLogin(request, env);
+  if (pathname === "/api/ctv/topups" && request.method === "POST") {
+    requireDb(env);
+    const session = await requireSession(request, env, "ctv");
+    rateLimit(request, "ctv-topup", 20, 60_000);
+    const user = await env.DB.prepare("SELECT id, username, balance FROM ctv_users WHERE id = ? AND active = 1").bind(Number(session.sub)).first();
+    if (!user) throw httpError(401, "Tài khoản không còn hoạt động.");
+    const account = await ctvPublicUser(env, user);
+    const body = await readJson(request);
+    return json(await createCtvTopup(env, user.id, Number(body.amount), account.unit_price, transferDetails(env, "")), 201);
+  }
+  const topupCode = pathname.match(/^\/api\/ctv\/topups\/(LGNAP[A-Z0-9]{8})$/);
+  if (topupCode && request.method === "GET") {
+    requireDb(env);
+    const session = await requireSession(request, env, "ctv");
+    return json(await readCtvTopup(env, Number(session.sub), topupCode[1], transferDetails(env, "")));
+  }
   if (pathname === "/api/ctv/logout" && request.method === "POST") return logout("lg_ctv");
   if (pathname === "/api/ctv/me" && request.method === "GET") return ctvMe(request, env);
   if (pathname === "/api/ctv/orders" && request.method === "GET") return ctvOrders(request, env);
@@ -258,6 +275,12 @@ async function sepayWebhook(request, env, ctx) {
   const transactionId = String(payload.id || "");
   if (!transactionId) throw httpError(400, "Thiếu mã giao dịch.");
   const content = `${payload.code || ""} ${payload.content || ""} ${payload.description || ""}`.toUpperCase();
+  const topupCode = content.match(/LGNAP[A-Z0-9]{8}/)?.[0];
+  if (topupCode) {
+    if (!Number.isSafeInteger(Number(payload.transferAmount))) throw httpError(400, "Số tiền giao dịch không hợp lệ.");
+    await creditCtvTopup(env, payload, topupCode);
+    return json({ success: true });
+  }
   const code = content.match(/LG[A-Z0-9]{8}/)?.[0];
 
   const inserted = await env.DB.prepare("INSERT OR IGNORE INTO payment_events (provider, transaction_id, amount, payload_json, outcome) VALUES ('sepay', ?, ?, ?, 'received')")
