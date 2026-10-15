@@ -11,7 +11,7 @@ export function addAdminCtv(dash, api, { escapeHtml: esc, money }) {
   const create = panel.querySelector("#admin-ctv-create");
   const edit = panel.querySelector("#admin-ctv-prices");
   const wallet = panel.querySelector("#admin-ctv-wallet");
-  const fields = (price = "") => `<label>Giá 1 lượt (VNĐ)<input name="unit_price" type="number" min="0" max="100000000" step="1" value="${price}" required></label><p>1 tháng: 1 lượt · 1 năm: 1 lượt · Vĩnh viễn: 2 lượt. Tiền trừ ví = giá 1 lượt × số lượt.</p>`;
+  const fields = (price = "") => `<label>Giá 1 lượt (VNĐ)<input name="unit_price" type="number" min="0" max="100000000" step="1" value="${price}" required></label><p>1 tháng: 1 lượt · 1 năm: 1 lượt · Vĩnh viễn: 2 lượt. Giá áp dụng cho lần mua lượt tiếp theo. Lượt đã mua giữ nguyên.</p>`;
   const fillPrices = () => { edit.querySelector('[data-price-fields="edit"]').innerHTML = fields(accounts.find((user) => String(user.id) === edit.elements.id.value)?.unit_price ?? ""); };
   const refresh = async () => {
     if (loading) return;
@@ -21,7 +21,7 @@ export function addAdminCtv(dash, api, { escapeHtml: esc, money }) {
       const data = await api("/api/admin/ctv");
       accounts = data.ctv;
       panel.querySelectorAll("[data-ctv-stat]").forEach((node) => { node.textContent = node.dataset.ctvStat === "balance" ? money(data.stats.balance) : Number(data.stats[node.dataset.ctvStat] || 0); });
-      panel.querySelector("#admin-ctv-list").innerHTML = accounts.length ? `<div class="table-wrap"><table><thead><tr><th>STT</th><th>Tài khoản CTV</th><th>Đơn đã bán</th><th>Số dư ví</th><th>Giá 1 lượt</th><th>Thao tác</th></tr></thead><tbody>${accounts.map((user, index) => `<tr><td>${index + 1}</td><td>${esc(user.username)}</td><td>${user.sold_orders}</td><td>${money(user.balance)}</td><td>${money(user.unit_price)} / lượt</td><td><button type="button" class="button button--small button--outline" data-edit-ctv="${user.id}">Chỉnh giá</button><button type="button" class="button button--small button--outline" data-wallet-ctv="${user.id}">Số dư</button></td></tr>`).join("")}</tbody></table></div>` : "<p>Chưa có cộng tác viên. Tạo tài khoản đầu tiên bên dưới.</p>";
+      panel.querySelector("#admin-ctv-list").innerHTML = accounts.length ? `<div class="table-wrap"><table><thead><tr><th>STT</th><th>Tài khoản CTV</th><th>Đơn đã bán</th><th>Số dư ví</th><th>Giá 1 lượt</th><th>Thao tác</th></tr></thead><tbody>${accounts.map((user, index) => `<tr><td>${index + 1}</td><td>${esc(user.username)}</td><td>${user.sold_orders}</td><td>${money(user.balance)}</td><td data-ctv-price-cell>${money(user.unit_price)} / lượt</td><td><button type="button" class="button button--small button--outline" data-edit-ctv="${user.id}">Sửa giá 1 lượt</button><button type="button" class="button button--small button--outline" data-wallet-ctv="${user.id}">Số dư</button></td></tr>`).join("")}</tbody></table></div>` : "<p>Chưa có cộng tác viên. Tạo tài khoản đầu tiên bên dưới.</p>";
       const selected = edit.elements.id.value;
       const selectedWallet = wallet.elements.username.value;
       edit.elements.id.innerHTML = accounts.map((user) => `<option value="${user.id}">${esc(user.username)}</option>`).join("");
@@ -33,7 +33,36 @@ export function addAdminCtv(dash, api, { escapeHtml: esc, money }) {
       edit.querySelector('[type="submit"]').disabled = !accounts.length;
       wallet.querySelector('[type="submit"]').disabled = !accounts.length;
       notice.textContent = "";
-      panel.querySelectorAll("[data-edit-ctv]").forEach((button) => button.addEventListener("click", () => { edit.elements.id.value = button.dataset.editCtv; fillPrices(); edit.scrollIntoView({ behavior: "smooth", block: "center" }); }));
+      panel.querySelectorAll("[data-edit-ctv]").forEach((button) => button.addEventListener("click", () => {
+        const account = accounts.find((user) => String(user.id) === button.dataset.editCtv);
+        const cell = button.closest("tr").querySelector("[data-ctv-price-cell]");
+        if (cell.querySelector("form")) { cell.querySelector("input").focus(); return; }
+        cell.innerHTML = `<form class="ctv-inline-price"><label>Giá 1 lượt của ${esc(account.username)} (VNĐ)<input name="unit_price" type="number" min="0" max="100000000" step="1" value="${account.unit_price}" required></label><div><button type="submit" class="button button--small">Lưu giá</button><button type="button" class="button button--small button--outline" data-cancel-price>Huỷ</button></div><p class="form-message" aria-live="polite"></p></form>`;
+        const form = cell.querySelector("form");
+        form.elements.unit_price.focus();
+        form.elements.unit_price.select();
+        form.querySelector("[data-cancel-price]").addEventListener("click", () => { cell.textContent = `${money(account.unit_price)} / lượt`; });
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const submit = form.querySelector('[type="submit"]');
+          if (submit.disabled) return;
+          const price = Number(form.elements.unit_price.value);
+          submit.disabled = true;
+          form.querySelector("[data-cancel-price]").disabled = true;
+          try {
+            await api("/api/admin/ctv/prices", { method: "POST", body: JSON.stringify({ id: account.id, unit_price: price }) });
+            account.unit_price = price;
+            await refresh();
+            notice.textContent = `Đã cập nhật giá 1 lượt của ${account.username}: ${money(price)}.`;
+            notice.className = "form-message is-success";
+          } catch (error) {
+            form.querySelector(".form-message").textContent = error.message;
+            form.querySelector(".form-message").className = "form-message is-error";
+            submit.disabled = false;
+            form.querySelector("[data-cancel-price]").disabled = false;
+          }
+        });
+      }));
       panel.querySelectorAll("[data-wallet-ctv]").forEach((button) => button.addEventListener("click", () => { wallet.elements.username.value = accounts.find((user) => String(user.id) === button.dataset.walletCtv).username; wallet.elements.delta.focus(); wallet.scrollIntoView({ behavior: "smooth", block: "center" }); }));
     } catch (error) { notice.textContent = error.message; notice.className = "form-message is-error"; }
     finally { loading = false; }
