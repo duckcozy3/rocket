@@ -630,7 +630,7 @@ async function renderAdmin() {
   dash.innerHTML = `<aside class="admin-sidebar">${brand()}<nav><a href="#overview">▦ Bảng điều khiển</a><a href="#orders-admin">▤ Đơn hàng</a><a href="#plans-admin">⌑ Bảng giá</a><a href="#posts">✎ Bài viết</a><a href="#promos">％ Mã giảm giá</a><a href="#settings">⚙ Cấu hình công khai</a><a href="#ctv-admin">♙ Cộng tác viên</a></nav><button id="admin-logout">Đăng xuất</button></aside><div class="admin-main"><div class="admin-top"><div><small>QUẢN TRỊ / Bảng điều khiển</small><h1>Quản lý Locket Gold</h1></div><a class="button button--small" href="/">Xem trang web ↗</a></div><section id="overview" class="metric-grid"><article><span>Tổng đơn hàng</span><strong data-admin-metric="orders">${Number(data.orders || 0)}</strong></article><article><span>Đã thanh toán</span><strong data-admin-metric="paid_orders">${Number(data.paid_orders || 0)}</strong></article><article><span>Cộng tác viên</span><strong data-admin-metric="ctv_users">${Number(data.ctv_users || 0)}</strong></article><article><span>Bài viết</span><strong data-admin-metric="posts">${Number(data.posts || 0)}</strong></article></section>${adminForms()}</div>`;
   const revenue = document.createElement("div");
   revenue.className = "admin-panel admin-revenue";
-  revenue.innerHTML = `<h2>Doanh thu</h2><p>Tính từ giá trị đơn đã thanh toán hoặc hoàn tất, sau giảm giá. Thời gian theo giờ Việt Nam; bao gồm đơn đã ẩn khỏi danh sách quản lý.</p><div class="table-wrap"><table><thead><tr><th>Thời gian</th><th>Đơn đã thanh toán</th><th>Doanh thu</th></tr></thead><tbody id="admin-revenue-rows"></tbody></table></div>`;
+  revenue.innerHTML = `<h2>Doanh thu</h2><p>Tính từ giá trị đơn đã thanh toán hoặc hoàn tất, sau giảm giá, còn hiển thị trong mục Đơn hàng. Tháng được tính theo thời điểm thanh toán (giờ Việt Nam).</p><div class="table-wrap"><table><thead><tr><th>Thời gian</th><th>Đơn đã thanh toán</th><th>Doanh thu</th></tr></thead><tbody id="admin-revenue-rows"></tbody></table></div>`;
   dash.querySelector("#overview").append(revenue);
   renderAdminRevenue(data.revenue);
   document.querySelector("#admin-logout").addEventListener("click", async () => { await api("/api/admin/logout", { method: "POST" }); location.reload(); });
@@ -705,7 +705,12 @@ let adminOverviewLoading = false;
 function renderAdminRevenue(revenue = []) {
   const target = document.querySelector("#admin-revenue-rows");
   if (!target) return;
-  target.innerHTML = [["today", "Hôm nay"], ["month", "Tháng này"], ["total", "Tổng cộng"]].map(([period, label]) => {
+  const currentMonth = new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", month: "2-digit", year: "numeric" }).format(new Date());
+  const months = revenue.filter((row) => /^month:\d{4}-\d{2}$/.test(row.period)).sort((a, b) => b.period.localeCompare(a.period));
+  target.innerHTML = [["today", "Hôm nay"], ["month", `Tháng ${currentMonth} (hiện tại)`], ["total", "Tổng cộng"], ...months.map((row) => {
+    const [year, month] = row.period.slice(6).split("-");
+    return [row.period, `Tháng ${month}/${year}`];
+  })].map(([period, label]) => {
     const row = revenue.find((item) => item.period === period);
     return `<tr><td>${label}</td><td>${Number(row?.orders || 0)}</td><td>${money(Number(row?.amount || 0))}</td></tr>`;
   }).join("");
