@@ -635,7 +635,7 @@ async function adminCreateCtv(request, env) {
   const prices = validateCtvPrices(body.prices || {});
   if (await env.DB.prepare("SELECT id FROM ctv_users WHERE username = ? COLLATE NOCASE").bind(username).first()) throw httpError(409, "Tên tài khoản CTV đã tồn tại.");
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const passwordHash = await pbkdf2(password, salt);
+  const passwordHash = `pbkdf2-sha256$100000$${await pbkdf2(password, salt)}`;
   try {
     await env.DB.batch([
       env.DB.prepare("INSERT INTO ctv_users (username, password_hash, password_salt, balance, active) VALUES (?, ?, ?, ?, 1)").bind(username, passwordHash, toBase64Url(salt), initialBalance),
@@ -709,7 +709,12 @@ async function ctvLogin(request, env) {
   const body = await readJson(request);
   const username = cleanText(body.username, 50).toLowerCase();
   const user = await env.DB.prepare("SELECT id, username, password_hash, password_salt, balance FROM ctv_users WHERE username = ? AND active = 1").bind(username).first();
-  if (!user || !(await constantTimeEqual(await pbkdf2(String(body.password || ""), fromBase64Url(user.password_salt)), user.password_hash))) throw httpError(401, "Thông tin đăng nhập không đúng.");
+  const password = typeof body.password === "string" ? body.password : "";
+  if (!user || !password || password.length > 1000 || !(await verifyCtvPassword(password, user))) throw httpError(401, "Thông tin đăng nhập không đúng.");
+  if (!user.password_hash.startsWith("pbkdf2-sha256$100000$")) {
+    const updatedHash = `pbkdf2-sha256$100000$${await pbkdf2(password, fromBase64Url(user.password_salt))}`;
+    await env.DB.prepare("UPDATE ctv_users SET password_hash = ? WHERE id = ? AND password_hash = ?").bind(updatedHash, user.id, user.password_hash).run();
+  }
   const token = await signSession({ role: "ctv", sub: String(user.id), exp: Date.now() + 12 * 60 * 60_000 }, env.SESSION_SECRET);
   const response = json({ user: await ctvPublicUser(env, user) });
   return withCookie(response, `lg_ctv=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=43200`);
@@ -866,9 +871,22 @@ async function hmac(value, secret) {
   return toBase64Url(new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(value))));
 }
 
-async function pbkdf2(password, salt) {
+async function verifyCtvPassword(password, user) {
+  const prefix = "pbkdf2-sha256$100000$";
+  const current = user.password_hash.startsWith(prefix);
+  try {
+    const actual = await pbkdf2(password, fromBase64Url(user.password_salt), current ? 100000 : 210000);
+    return constantTimeEqual(actual, current ? user.password_hash.slice(prefix.length) : user.password_hash);
+  } catch (error) {
+    if (error.name === "NotSupportedError" && /iteration/i.test(error.message)) return false;
+    throw error;
+  }
+}
+
+async function pbkdf2(password, salt, iterations = 100000) {
   const material = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: 210000 }, material, 256);
+  // Cloudflare production caps PBKDF2 at 100,000 iterations; local workerd does not.
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations }, material, 256);
   return toBase64Url(new Uint8Array(bits));
 }
 

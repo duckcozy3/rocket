@@ -21,6 +21,8 @@ Trang `/cong-tac-vien/` sử dụng tài khoản và ví nội bộ trên locket
 
 Trang CTV gọi `/api/ctv/local/login`, `/me`, `/orders`, `/logout` để luôn dùng tài khoản D1 được tạo trong admin, không bị chuyển sang đăng nhập NoDNS bởi cấu hình `NODNS_CTV_PORTAL` cũ. Đăng nhập thành công mở bảng điều khiển CTV tại cùng đường dẫn; tải lại trang khôi phục phiên từ cookie. Các endpoint `/api/ctv/*` cũ vẫn giữ hành vi tương thích theo cấu hình.
 
+Mật khẩu CTV mới dùng PBKDF2-SHA256 với 100.000 vòng và lưu tiền tố phiên bản trong `password_hash`, phù hợp giới hạn Cloudflare production. Kiểm thử tạo/đăng nhập mô phỏng giới hạn này vì Node và workerd local không áp dụng nó. Hash cũ 210.000 vòng chỉ có thể xác minh và nâng cấp ở runtime hỗ trợ; production từ chối hash cũ bằng lỗi đăng nhập thay vì trả 500. Thay đổi này không sửa ví, bảng giá hoặc lịch sử đơn.
+
 Kho bài viết được nhập với quyền sử dụng do chủ website xác nhận từ `https://locketgold.app/bai-viet`: 2.499 bài, lưu riêng tại `public/imported-posts/` và ảnh tại `public/images/imported-posts/`. Trang bài viết ghép kho này với các bài được đăng qua quản trị và phân trang 20 bài/trang. Nội dung giữ tiêu đề, ngày đăng, phần giới thiệu và các đoạn, danh sách, định dạng của trang nguồn; mã thực thi của trang nguồn không được nhập.
 
 Nhập lại bằng `python scripts/import-source-posts.py` (cần `requests` và `beautifulsoup4`). Script dùng bộ nhớ đệm trong `tmp/source-posts/` để tiếp tục khi mất kết nối. Kiểm tra đối chiếu toàn bộ nội dung với HTML nguồn đã lưu bằng `python scripts/verify-source-posts.py`. Báo cáo số bài và ảnh nguồn không còn tồn tại nằm ở `public/imported-posts/import-report.json`.

@@ -4,7 +4,14 @@ import { DatabaseSync } from "node:sqlite";
 import { readFile, readdir } from "node:fs/promises";
 import worker from "../worker/index.js";
 
-test("local CTV management creates protected accounts, sets individual prices, debits wallets and aggregates sales", async () => {
+test("local CTV management creates protected accounts, sets individual prices, debits wallets and aggregates sales", async (t) => {
+  const deriveBits = crypto.subtle.deriveBits.bind(crypto.subtle);
+  t.mock.method(crypto.subtle, "deriveBits", async (algorithm, key, length) => {
+    if (algorithm.name === "PBKDF2" && algorithm.iterations > 100000) {
+      throw new DOMException("Pbkdf2 failed: iteration counts above 100000 are not supported", "NotSupportedError");
+    }
+    return deriveBits(algorithm, key, length);
+  });
   const sqlite = new DatabaseSync(":memory:");
   try {
     const directory = new URL("../migrations/", import.meta.url);
@@ -47,6 +54,7 @@ test("local CTV management creates protected accounts, sets individual prices, d
     assert.ok(!JSON.stringify(list).includes("password"));
     const saved = sqlite.prepare("SELECT password_hash FROM ctv_users WHERE username = 'alice'").get();
     assert.notEqual(saved.password_hash, alice.password);
+    assert.match(saved.password_hash, /^pbkdf2-sha256\$100000\$/);
     const ctvLogin = await call("/api/ctv/login", "", { username: "alice", password: alice.password });
     assert.equal(ctvLogin.status, 200);
     const ctv = ctvLogin.headers.get("Set-Cookie").split(";")[0];
