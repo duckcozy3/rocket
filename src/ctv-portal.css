@@ -149,6 +149,44 @@
 .ctvp-buy-price-list button { display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left; padding: 18px; border: 1px solid #30263e; border-radius: 14px; color: #e3cff9; background: #161221; }
 .ctvp-buy-price-list small { display: block; color: #8997b1; font-size: 11px; margin-top: 5px; }
 .ctvp-buy-note { margin-top: 30px; padding: 14px; background: #1e192b; border: 1px solid #33283e; border-radius: 12px; color: #8c9cba; font-size: 12px; }
+.ctvp-help-columns { align-items: start; }
+.ctvp-help-card { padding: 22px; }
+.ctvp-help-card h2 { font-size: 17px; margin-bottom: 18px; }
+.ctvp-help-symbol { color: #ffca28; font-size: 25px; margin-right: 8px; }
+.ctvp-help-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.ctvp-help-heading > span { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid #155772; border-radius: 14px; background: #0c2f44; color: #38ccff; font-size: 25px; }
+.ctvp-help-heading h2 { margin-bottom: 0; }
+.ctvp-help-heading p { color: #8495b4; font-size: 11px; margin: 3px 0 0; }
+.ctvp-help-step { display: flex; align-items: flex-start; gap: 12px; margin: 16px 0; }
+.ctvp-help-number { width: 27px; height: 27px; flex: 0 0 27px; display: grid; place-items: center; border-radius: 50%; background: #9335dc; color: #fff; font-weight: 800; font-size: 12px; }
+.ctvp-help-number.is-blue { background: #008fbe; }
+.ctvp-help-number.is-amber { background: #f3a000; color: #241700; }
+.ctvp-help-number.is-green { background: #009b79; }
+.ctvp-help-step > div { min-width: 0; width: 100%; }
+.ctvp-help-step h3 { margin: 2px 0 6px; color: #f0eafa; font-size: 13px; }
+.ctvp-help-step p { color: #93a7c6; margin: 5px 0 12px; font-size: 12px; line-height: 1.8; }
+.ctvp-help-card:last-child .ctvp-help-step { padding-bottom: 18px; border-bottom: 1px solid #282031; margin-bottom: 22px; }
+.ctvp-help-card:last-child .ctvp-help-step:nth-last-of-type(1) { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+.ctvp-help-download { background: #0d0c17; border: 1px solid #2b2337; border-radius: 14px; padding: 15px; margin: 12px 0; }
+.ctvp-help-download small { color: #7f93b6; font-size: 10px; }
+.ctvp-help-download > div { display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-top: 6px; }
+.ctvp-help-download a { font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
+.ctvp-help-download button { color: #b7c2d9; background: #201d2c; padding: 9px; border: 1px solid #3a304b; border-radius: 10px; white-space: nowrap; font-size: 11px; }
+.ctvp-help-warning, .ctvp-help-alert { border-radius: 12px; padding: 13px; font-size: 11px; line-height: 1.8; margin: 12px 0; }
+.ctvp-help-warning { color: #ffd04f; background: #302416; border: 1px solid #644821; }
+.ctvp-help-alert { color: #ff809a; background: #2b1827; border: 1px solid #66304b; }
+.ctvp-help-substeps { list-style: none; counter-reset: substep; padding: 0; margin: 12px 0; }
+.ctvp-help-substeps li { counter-increment: substep; color: #99abc8; font-size: 11px; line-height: 1.9; margin: 8px 0; }
+.ctvp-help-substeps li::before { content: counter(substep); display: inline-grid; place-items: center; width: 20px; height: 20px; margin-right: 7px; border-radius: 50%; background: #552581; color: #e7c5ff; font-size: 10px; font-weight: 700; }
+.ctvp-help-substeps code { background: #281a3c; color: #c8a0f4; padding: 3px 6px; border-radius: 4px; font-size: 10px; }
+.ctvp-help-substeps.is-amber code { color: #f3c03e; background: #322315; }
+.ctvp-help-substeps.is-amber li::before { background: #614013; color: #ffce54; }
+.ctvp-help-results { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ctvp-help-results span { border: 1px solid #185444; background: #102820; color: #7bd8bb; padding: 10px; border-radius: 10px; font-size: 10px; line-height: 1.7; }
+.ctvp-help-results span:last-child { border-color: #66304b; color: #ff91a8; background: #2b1827; }
+.ctvp-help-copy-status { color: #7bd8bb; font-size: 12px; margin: 10px 0 0; }
+.ctvp-help-sources { color: #8293af; font-size: 10px; margin: 12px 0 0; }
+.ctvp-help-sources a { color: #bba0e3; text-decoration: underline; }
 @media (max-width: 700px) { .ctvp-buy-metrics { grid-template-columns: 1fr 1fr; } .ctvp-buy-columns > section { min-height: auto; } }
 @media (max-width: 700px) { .ctvp-deposit-metrics { grid-template-columns: 1fr 1fr; } .ctvp-bank-details { grid-template-columns: 1fr; } }
 @media (min-width: 1650px) { #ctv-dashboard.ctvp { grid-template-columns: 300px minmax(0, 1fr); } .ctvp-content { padding: 25px; } }
