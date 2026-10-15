@@ -1,4 +1,5 @@
 import "./styles.css";
+import "./admin-theme.css";
 import { addAdminCtv } from "./admin-ctv.js";
 import "./ctv-portal.css";
 import { mountCtvPortal } from "./ctv-portal.js";
