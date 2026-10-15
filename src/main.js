@@ -1,4 +1,5 @@
 import "./styles.css";
+import { initSiteLoader } from "./site-loader.js";
 import "./admin-theme.css";
 import { addAdminCtv } from "./admin-ctv.js";
 import "./ctv-portal.css";
@@ -31,6 +32,7 @@ const app = document.querySelector("#app");
 const { render, defaultDnsUrl, money, escapeHtml, brand, planCards, checkoutPlanOptions, formatDate } = createPageRenderer(page, location.search);
 
 if (!app.hasChildNodes()) app.innerHTML = render();
+const siteLoading = initSiteLoader(page);
 document.querySelector("#current-year")?.replaceChildren(String(new Date().getFullYear()));
 
 function initNavigation() {
@@ -225,6 +227,7 @@ async function initWelcomeModal() {
   modal.addEventListener("cancel", close);
   modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
   modal.querySelectorAll("a").forEach((link) => link.addEventListener("click", close));
+  await siteLoading;
   window.requestAnimationFrame(() => { if (!modal.open) modal.showModal(); });
 }
 
