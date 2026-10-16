@@ -694,11 +694,21 @@ async function renderAdmin() {
     if (!document.hidden && !dash.querySelector("#overview")?.hidden) loadAdminOverview();
   }, 10000);
   bindAdminForms();
+  dash.querySelector("#admin-order-search")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    adminOrderQuery = dash.querySelector("#admin-order-query").value.trim();
+    loadAdminOrders();
+  });
+  dash.querySelector("#admin-order-reset")?.addEventListener("click", () => {
+    dash.querySelector("#admin-order-query").value = "";
+    adminOrderQuery = "";
+    loadAdminOrders();
+  });
   initPostImages(dash, api);
 }
 
 function adminForms() {
-  return `<section id="orders-admin" class="admin-panel"><h2>Đơn hàng mới nhất</h2><div id="admin-orders"><p>Đang tải…</p></div></section>
+  return `<section id="orders-admin" class="admin-panel"><h2>Đơn hàng mới nhất</h2><form id="admin-order-search" role="search"><label for="admin-order-query">Tên người dùng hoặc mã đơn hàng</label><div class="form-row"><input id="admin-order-query" type="search" maxlength="200" placeholder="Nhập tên người dùng hoặc mã đơn hàng…"><button class="button button--small" type="submit">Tìm kiếm</button><button class="button button--small button--outline" id="admin-order-reset" type="button">Xóa bộ lọc</button></div></form><p id="admin-order-search-status" role="status"></p><div id="admin-orders"><p>Đang tải…</p></div></section>
   <section id="plans-admin" class="admin-panel"><h2>Cập nhật bảng giá</h2><p>Giá cũ chỉ hiển thị khi nhập mức giá thật cao hơn giá đang bán; để trống nếu không có khuyến mãi.</p><form data-admin-endpoint="/api/admin/plans"><div class="form-row"><label>Gói<select name="id">${fallbackPlans.map((plan) => `<option value="${plan.id}">${plan.platform} · ${plan.name}</option>`).join("")}</select></label><label>Giá hiện tại (VNĐ)<input name="price" type="number" min="0" step="1000" required></label></div><label>Giá cũ (tùy chọn)<input name="old_price" type="number" min="0" step="1000"></label><button class="button" type="submit">Lưu giá</button><p class="form-message"></p></form></section>
   <section id="posts" class="admin-panel"><h2>Đăng bài viết</h2><form data-admin-endpoint="/api/admin/posts"><label>Tiêu đề<input name="title" required maxlength="140"></label><label>Đoạn giới thiệu<textarea name="excerpt" required maxlength="320"></textarea></label><label>Nội dung<textarea name="content" required rows="8"></textarea></label><button class="button" type="submit">Xuất bản</button><p class="form-message"></p></form></section>
   <section id="promos" class="admin-panel"><h2>Tạo mã giảm giá</h2><form data-admin-endpoint="/api/admin/promos"><div class="form-row"><label>Mã<input name="code" required maxlength="32"></label><label>Phần trăm<input name="percent" type="number" min="1" max="100" required></label></div><label>Ngày hết hạn<input name="expires_at" type="datetime-local"></label><button class="button" type="submit">Lưu mã</button><p class="form-message"></p></form></section>
@@ -733,13 +743,17 @@ async function loadAdminOverview() {
 }
 
 let adminOrdersLoading = false;
+let adminOrderQuery = "";
 async function loadAdminOrders() {
   const target = document.querySelector("#admin-orders");
   if (!target || adminOrdersLoading) return;
   adminOrdersLoading = true;
+  const query = adminOrderQuery;
   try {
-    const { orders: receivedOrders } = await api("/api/admin/orders");
+    const { orders: receivedOrders } = await api(`/api/admin/orders${query ? `?q=${encodeURIComponent(query)}` : ""}`);
+    if (query !== adminOrderQuery) return;
     const orders = receivedOrders.filter((order) => visibleAdminOrder(order));
+    document.querySelector("#admin-order-search-status").textContent = query ? `Tìm thấy ${orders.length}${orders.length === 100 ? "+" : ""} đơn hàng khớp với “${query}”. Hiển thị tối đa 100 đơn mới nhất.` : "Hiển thị tối đa 100 đơn hàng mới nhất.";
     target.innerHTML = orders.length ? `<div class="table-wrap"><table><thead><tr><th>Mã</th><th>Thời gian đặt (giờ VN)</th><th>Tên người dùng</th><th>Liên hệ</th><th>Gói</th><th>Số tiền</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${orders.map((order) => `<tr><td>${escapeHtml(order.code)}</td><td>${escapeHtml(orderCreatedLabel(order.created_at))}</td><td>${escapeHtml(order.username)}</td><td>${escapeHtml(order.contact)}</td><td>${escapeHtml(planNameLabel(order.plan_name))}</td><td>${money(order.amount)}</td><td><span class="status status--${escapeHtml(order.status)}">${escapeHtml(orderStatusLabel(order.status))}</span></td><td><button type="button" class="button button--small button--outline" data-delete-order="${escapeHtml(order.code)}">Xoá</button></td></tr>`).join("")}</tbody></table></div>` : "<p>Chưa có đơn hàng.</p>";
     target.querySelectorAll("[data-delete-order]").forEach((button) => button.addEventListener("click", async () => {
       const code = button.dataset.deleteOrder;
@@ -763,7 +777,7 @@ async function loadAdminOrders() {
       }
     });
   } catch (error) { target.innerHTML = `<p>${escapeHtml(error.message)}</p>`; }
-  finally { adminOrdersLoading = false; }
+  finally { adminOrdersLoading = false; if (query !== adminOrderQuery) loadAdminOrders(); }
 }
 
 function bindAdminForms() {

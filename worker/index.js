@@ -458,19 +458,23 @@ async function adminOverview(request, env) {
 async function adminOrders(request, env) {
   await requireSession(request, env, "admin"); requireDb(env);
   await expirePendingOrders(env);
-  const { results } = await visibleAdminOrdersQuery(env, "code, username, contact, plan_name, amount, status, expires_at, expired_at, gold_revoked_at, created_at", " ORDER BY created_at DESC LIMIT 100");
+  const query = (new URL(request.url).searchParams.get("q") || "").trim().slice(0, 200);
+  const filter = query ? " AND (instr(lower(username), lower(?)) > 0 OR instr(lower(code), lower(?)) > 0)" : "";
+  const { results } = await visibleAdminOrdersQuery(env, "code, username, contact, plan_name, amount, status, expires_at, expired_at, gold_revoked_at, created_at", `${filter} ORDER BY created_at DESC LIMIT 100`, query ? [query, query] : []);
   return json({ orders: results || [] });
 }
 
-async function visibleAdminOrdersQuery(env, columns, tail = "") {
+async function visibleAdminOrdersQuery(env, columns, tail = "", values = []) {
   const base = `SELECT ${columns} FROM orders WHERE expired_at IS NULL`;
   const suffix = " AND NOT EXISTS (SELECT 1 FROM settings WHERE key = 'admin_deleted_order:' || orders.code)" + tail;
   try {
-    return await env.DB.prepare(`${base} AND admin_deleted_at IS NULL${suffix}`).all();
+    const statement = env.DB.prepare(`${base} AND admin_deleted_at IS NULL${suffix}`);
+    return await (values.length ? statement.bind(...values) : statement).all();
   } catch (error) {
     if (!missingAdminDeletedColumn(error)) throw error;
     // Existing production databases may not have migration 0011 yet.
-    return await env.DB.prepare(`${base}${suffix}`).all();
+    const statement = env.DB.prepare(`${base}${suffix}`);
+    return await (values.length ? statement.bind(...values) : statement).all();
   }
 }
 

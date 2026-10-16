@@ -62,6 +62,11 @@ for (const migrated of [false, true]) {
       }
       for (let index = 0; index < 105; index++) insert.run(`LGNEW${index}`, "paid", "2026-01-01T00:00:00Z");
       assert.equal((await (await call()).json()).orders.length, 100);
+      assert.deepEqual((await (await call("?q=oldpending")).json()).orders.map((order) => order.code), ["LGOLDPENDING"]);
+      assert.equal((await (await call("?q=ALICE")).json()).orders.length, 100);
+      assert.equal((await (await call("?q=not-found")).json()).orders.length, 0);
+      assert.equal((await (await call("?q=%25")).json()).orders.length, 0);
+      assert.equal((await (await call("?q=" + encodeURIComponent("' OR 1=1 --"))).json()).orders.length, 0);
       assert.equal((await overview()).orders, 106);
       assert.equal((await overview()).paid_orders, 105);
     } finally { sqlite.close(); }
