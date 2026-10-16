@@ -460,8 +460,14 @@ async function adminOrders(request, env) {
   await expirePendingOrders(env);
   const query = (new URL(request.url).searchParams.get("q") || "").trim().slice(0, 200);
   const filter = query ? " AND (instr(lower(username), lower(?)) > 0 OR instr(lower(code), lower(?)) > 0)" : "";
-  const { results } = await visibleAdminOrdersQuery(env, "code, username, contact, plan_name, amount, status, expires_at, expired_at, gold_revoked_at, created_at", `${filter} ORDER BY created_at DESC LIMIT 100`, query ? [query, query] : []);
-  return json({ orders: results || [] });
+  const values = query ? [query, query] : [];
+  const count = await visibleAdminOrdersQuery(env, "COUNT(*) AS count", filter, values);
+  const total = Number(count.results?.[0]?.count || 0);
+  const totalPages = Math.max(1, Math.ceil(total / 100));
+  const requestedPage = Number(new URL(request.url).searchParams.get("page") || 1);
+  const page = Math.min(totalPages, Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1);
+  const { results } = await visibleAdminOrdersQuery(env, "code, username, contact, plan_name, amount, status, expires_at, expired_at, gold_revoked_at, created_at", `${filter} ORDER BY created_at DESC, code DESC LIMIT 100 OFFSET ?`, [...values, (page - 1) * 100]);
+  return json({ orders: results || [], page, page_size: 100, total, total_pages: totalPages });
 }
 
 async function visibleAdminOrdersQuery(env, columns, tail = "", values = []) {

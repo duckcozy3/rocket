@@ -62,6 +62,18 @@ for (const migrated of [false, true]) {
       }
       for (let index = 0; index < 105; index++) insert.run(`LGNEW${index}`, "paid", "2026-01-01T00:00:00Z");
       assert.equal((await (await call()).json()).orders.length, 100);
+      const firstPage = await (await call()).json();
+      const secondPage = await (await call("?page=2")).json();
+      assert.equal(firstPage.total, 106);
+      assert.equal(firstPage.total_pages, 2);
+      assert.equal(secondPage.page, 2);
+      assert.equal(secondPage.orders.length, 6);
+      assert.equal(new Set([...firstPage.orders, ...secondPage.orders].map((order) => order.code)).size, 106);
+      assert.equal((await (await call("?page=999")).json()).page, 2);
+      assert.equal((await (await call("?page=-1")).json()).page, 1);
+      const searchedPage = await (await call("?q=oldpending&page=2")).json();
+      assert.equal(searchedPage.page, 1);
+      assert.equal(searchedPage.total, 1);
       assert.deepEqual((await (await call("?q=oldpending")).json()).orders.map((order) => order.code), ["LGOLDPENDING"]);
       assert.equal((await (await call("?q=ALICE")).json()).orders.length, 100);
       assert.equal((await (await call("?q=not-found")).json()).orders.length, 0);

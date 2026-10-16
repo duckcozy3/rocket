@@ -697,11 +697,13 @@ async function renderAdmin() {
   dash.querySelector("#admin-order-search")?.addEventListener("submit", (event) => {
     event.preventDefault();
     adminOrderQuery = dash.querySelector("#admin-order-query").value.trim();
+    adminOrderPage = 1;
     loadAdminOrders();
   });
   dash.querySelector("#admin-order-reset")?.addEventListener("click", () => {
     dash.querySelector("#admin-order-query").value = "";
     adminOrderQuery = "";
+    adminOrderPage = 1;
     loadAdminOrders();
   });
   initPostImages(dash, api);
@@ -744,17 +746,29 @@ async function loadAdminOverview() {
 
 let adminOrdersLoading = false;
 let adminOrderQuery = "";
+let adminOrderPage = 1;
 async function loadAdminOrders() {
   const target = document.querySelector("#admin-orders");
   if (!target || adminOrdersLoading) return;
   adminOrdersLoading = true;
   const query = adminOrderQuery;
+  const requestedPage = adminOrderPage;
   try {
-    const { orders: receivedOrders } = await api(`/api/admin/orders${query ? `?q=${encodeURIComponent(query)}` : ""}`);
-    if (query !== adminOrderQuery) return;
+    const { orders: receivedOrders, page, total, total_pages: totalPages } = await api(`/api/admin/orders?page=${requestedPage}&q=${encodeURIComponent(query)}`);
+    if (query !== adminOrderQuery || requestedPage !== adminOrderPage) return;
+    adminOrderPage = page;
     const orders = receivedOrders.filter((order) => visibleAdminOrder(order));
-    document.querySelector("#admin-order-search-status").textContent = query ? `Tìm thấy ${orders.length}${orders.length === 100 ? "+" : ""} đơn hàng khớp với “${query}”. Hiển thị tối đa 100 đơn mới nhất.` : "Hiển thị tối đa 100 đơn hàng mới nhất.";
+    document.querySelector("#admin-order-search-status").textContent = `Hiển thị ${total ? (page - 1) * 100 + 1 : 0}–${Math.min(page * 100, total)} trong ${total} đơn hàng${query ? ` khớp với “${query}”` : ""}. Trang ${page}/${totalPages}.`;
     target.innerHTML = orders.length ? `<div class="table-wrap"><table><thead><tr><th>Mã</th><th>Thời gian đặt (giờ VN)</th><th>Tên người dùng</th><th>Liên hệ</th><th>Gói</th><th>Số tiền</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${orders.map((order) => `<tr><td>${escapeHtml(order.code)}</td><td>${escapeHtml(orderCreatedLabel(order.created_at))}</td><td>${escapeHtml(order.username)}</td><td>${escapeHtml(order.contact)}</td><td>${escapeHtml(planNameLabel(order.plan_name))}</td><td>${money(order.amount)}</td><td><span class="status status--${escapeHtml(order.status)}">${escapeHtml(orderStatusLabel(order.status))}</span></td><td><button type="button" class="button button--small button--outline" data-delete-order="${escapeHtml(order.code)}">Xoá</button></td></tr>`).join("")}</tbody></table></div>` : "<p>Chưa có đơn hàng.</p>";
+    if (totalPages > 1) {
+      const pages = [...new Set([1, page - 1, page, page + 1, totalPages])].filter((number) => number > 0 && number <= totalPages).sort((a, b) => a - b);
+      const pageButton = (number, label = number) => `<button type="button" class="button button--small button--outline" data-order-page="${number}"${number === page ? ' disabled aria-current="page"' : ""}>${label}</button>`;
+      target.insertAdjacentHTML("beforeend", `<nav class="post-pagination" aria-label="Phân trang đơn hàng">${page > 1 ? pageButton(page - 1, "← Trước") : ""}${pages.map((number, index) => `${index && number > pages[index - 1] + 1 ? '<span aria-hidden="true">…</span>' : ""}${pageButton(number)}`).join("")}${page < totalPages ? pageButton(page + 1, "Sau →") : ""}</nav>`);
+      target.querySelectorAll("[data-order-page]").forEach((button) => button.addEventListener("click", () => {
+        adminOrderPage = Number(button.dataset.orderPage);
+        loadAdminOrders();
+      }));
+    }
     target.querySelectorAll("[data-delete-order]").forEach((button) => button.addEventListener("click", async () => {
       const code = button.dataset.deleteOrder;
       if (!window.confirm(`Xoá đơn ${code} khỏi danh sách quản trị? Lịch sử thanh toán vẫn được lưu để đối soát.`)) return;
@@ -777,7 +791,7 @@ async function loadAdminOrders() {
       }
     });
   } catch (error) { target.innerHTML = `<p>${escapeHtml(error.message)}</p>`; }
-  finally { adminOrdersLoading = false; if (query !== adminOrderQuery) loadAdminOrders(); }
+  finally { adminOrdersLoading = false; if (query !== adminOrderQuery || (requestedPage !== adminOrderPage && adminOrderPage !== undefined)) loadAdminOrders(); }
 }
 
 function bindAdminForms() {
