@@ -16,6 +16,7 @@ import { addProviderKeyForm } from "./admin-provider-key.js";
 import { initPostImages } from "./admin-post-images.js";
 import { createPageRenderer } from "./page-render.js";
 import { articleMarkup, archiveView } from "./post-view.js";
+import { articleSeo } from "./post-seo.js";
 import { mergePostArchive } from "./post-archive.js";
 import { FALLBACK_POSTS as fallbackPosts } from "./fallback-posts.js";
 import { postUrl } from "./sitemap.js";
@@ -163,6 +164,8 @@ async function loadPosts() {
     list.innerHTML = articleMarkup(post);
     document.querySelector(".page-hero")?.remove();
     document.title = `${post.title} | Locket Gold`;
+    document.querySelectorAll("[data-post-seo]").forEach((element) => element.remove());
+    document.head.insertAdjacentHTML("beforeend", articleSeo(post).html);
     document.querySelector('link[rel="canonical"]')?.setAttribute("href", postUrl(post.slug));
     document.querySelector('meta[name="description"]')?.setAttribute("content", post.excerpt || post.title);
   };
@@ -185,6 +188,8 @@ async function loadPosts() {
     const imported = archive.status === "fulfilled" && Array.isArray(archive.value) ? archive.value : [];
     const posts = mergePostArchive(livePosts, imported);
     const view = archiveView(posts, new URLSearchParams(location.search).get("trang"));
+    document.title = `Bài viết Locket Gold${view.page > 1 ? ` – Trang ${view.page}` : ""} | Hướng dẫn & mẹo sử dụng`;
+    document.querySelector('link[rel="canonical"]')?.setAttribute("href", `https://locketgold.info/bai-viet/${view.page > 1 ? `?trang=${view.page}` : ""}`);
     list.innerHTML = view.cards;
     document.querySelector(".post-archive-controls")?.remove();
     list.insertAdjacentHTML("afterend", view.controls);

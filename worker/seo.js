@@ -3,6 +3,7 @@ import { FALLBACK_POSTS } from "../src/fallback-posts.js";
 import { postForDisplay } from "../src/post-brand.js";
 import { mergePostArchive } from "../src/post-archive.js";
 import { articleMarkup, archiveView } from "../src/post-view.js";
+import { articleSeo } from "../src/post-seo.js";
 
 async function assetJson(request, env, path) {
   const response = await env.ASSETS.fetch(new Request(new URL(path, request.url)));
@@ -60,6 +61,7 @@ export async function postsResponse(request, env) {
     const view = archiveView(mergePostArchive(live.results?.length ? live.results : FALLBACK_POSTS, archive), url.searchParams.get("trang"));
     const canonical = `https://locketgold.info/bai-viet/${view.page > 1 ? `?trang=${view.page}` : ""}`;
     return finishHtml(request, response, new HTMLRewriter()
+      .on("title", { element(element) { element.setInnerContent(`Bài viết Locket Gold${view.page > 1 ? ` – Trang ${view.page}` : ""} | Hướng dẫn & mẹo sử dụng`); } })
       .on('link[rel="canonical"]', { element(element) { element.setAttribute("href", canonical); } })
       .on("#post-list", { element(element) { element.setInnerContent(view.cards, { html: true }); element.after(view.controls, { html: true }); } })
       .on(".post-archive-controls", { element(element) { element.remove(); } }));
@@ -79,10 +81,12 @@ export async function postsResponse(request, env) {
     return new Response(request.method === "HEAD" ? null : response.body, { status: 404, headers });
   }
   const display = postForDisplay(post);
+  const seo = articleSeo(post);
   return finishHtml(request, response, new HTMLRewriter()
+    .on("head", { element(element) { element.append(seo.html, { html: true }); } })
     .on('link[rel="canonical"]', { element(element) { element.setAttribute("href", postUrl(slug)); } })
     .on("title", { element(element) { element.setInnerContent(`${display.title} | Locket Gold`); } })
-    .on('meta[name="description"]', { element(element) { element.setAttribute("content", display.excerpt || display.title); } })
+    .on('meta[name="description"]', { element(element) { element.setAttribute("content", seo.description); } })
     .on(".page-hero", { element(element) { element.remove(); } })
     .on(".post-archive-controls", { element(element) { element.remove(); } })
     .on("#post-list", { element(element) {

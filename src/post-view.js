@@ -27,7 +27,7 @@ export function formatDate(value) {
 export function articleMarkup(rawPost) {
   const post = postForDisplay(rawPost);
   const cover = /^\/images\/imported-posts\/[a-f0-9]{24}\.(png|jpe?g|webp|gif)$/.test(post.cover || "") ? `<img class="article-cover" src="${escapeHtml(post.cover)}" alt="${escapeHtml(post.title)}" decoding="async">` : "";
-  return `<article><a class="text-link" href="/bai-viet/">← Tất cả bài viết</a><span>${escapeHtml(formatDate(post.published_at))}${post.category ? ` · ${escapeHtml(post.category)}` : ""}</span><h1>${escapeHtml(post.title)}</h1>${cover}<p class="article-lead">${escapeHtml(post.excerpt)}</p><div class="article-body">${renderPostContent(post.content, post.content_blocks)}</div></article>`;
+  return `<article><nav aria-label="Đường dẫn bài viết"><a href="/">Trang chủ</a> / <a class="text-link" href="/bai-viet/">Bài viết</a></nav><p class="article-author">Biên tập: <a href="/lien-he/">Locket Gold</a></p><span>${escapeHtml(formatDate(post.published_at))}${post.category ? ` · ${escapeHtml(post.category)}` : ""}</span><h1>${escapeHtml(post.title)}</h1>${cover}<p class="article-lead">${escapeHtml(post.excerpt)}</p><div class="article-body">${renderPostContent(post.content, post.content_blocks)}</div></article>`;
 }
 
 export function archiveView(posts, requestedPage) {
