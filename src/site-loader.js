@@ -2,6 +2,15 @@ import "./site-loader.css";
 
 export function initSiteLoader(page) {
   if (["admin", "ctv"].includes(page)) return;
+  try {
+    if (sessionStorage.getItem("locketgold:site-loader-seen") === "1") return;
+    sessionStorage.setItem("locketgold:site-loader-seen", "1");
+  } catch {
+    // If storage is unavailable, still skip the loader on internal navigation.
+    try {
+      if (document.referrer && new URL(document.referrer).origin === location.origin) return;
+    } catch { /* An invalid referrer should not prevent the page from opening. */ }
+  }
   const overlay = document.createElement("div");
   overlay.className = "site-loader";
   overlay.innerHTML = `<div aria-hidden="true"><span class="site-loader-decoration">🎀</span><span class="site-loader-decoration">👑</span><span class="site-loader-decoration">✨</span><span class="site-loader-decoration">💗</span><span class="site-loader-decoration">⚡</span></div><div class="site-loader-content"><img class="site-loader-logo" src="/images/logo.png" alt="Locketgold.info Hello Kitty" width="1536" height="1024" fetchpriority="high" decoding="async"><p class="site-loader-caption">Một chút dễ thương đang bay đến bạn…</p><div class="site-loader-track" role="progressbar" aria-label="Đang chuẩn bị trang web" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="site-loader-fill"></span><span class="site-loader-kitty" aria-hidden="true"><img src="/images/loading-kitty.svg" width="160" height="150" alt=""></span></div><div class="site-loader-meta"><span class="site-loader-message">Đang chuẩn bị trang web…</span><strong class="site-loader-percent">0%</strong></div><button class="site-loader-skip" type="button">Vào trang ngay →</button></div>`;
@@ -37,7 +46,7 @@ export function initSiteLoader(page) {
   overlay.querySelector("button").addEventListener("click", close, { signal: controller.signal });
   const tick = (now) => {
     if (closed) return;
-    // Start from zero on every page load, including reloads with cached assets.
+    // Animate only on the first public page opened in this tab session.
     const current = Math.min(100, Math.max(0, (now - started) / duration) * 100);
     const value = Math.floor(current);
     overlay.style.setProperty("--loader-progress", String(current / 100));
