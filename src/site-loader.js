@@ -1,7 +1,8 @@
 import "./site-loader.css";
 
 export function initSiteLoader(page) {
-  if (["admin", "ctv"].includes(page)) return;
+  // Prerendered pages are already usable; avoid blocking them with a timed overlay.
+  if (document.querySelector("#app main") || ["admin", "ctv"].includes(page)) return;
   const overlay = document.createElement("div");
   overlay.className = "site-loader";
   overlay.innerHTML = `<div aria-hidden="true"><span class="site-loader-decoration">🎀</span><span class="site-loader-decoration">👑</span><span class="site-loader-decoration">✨</span><span class="site-loader-decoration">💗</span><span class="site-loader-decoration">⚡</span></div><div class="site-loader-content"><img class="site-loader-logo" src="/images/logo.png" alt="Locketgold.info Hello Kitty" width="1536" height="1024" fetchpriority="high" decoding="async"><p class="site-loader-caption">Một chút dễ thương đang bay đến bạn…</p><div class="site-loader-track" role="progressbar" aria-label="Đang chuẩn bị trang web" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="site-loader-fill"></span><span class="site-loader-kitty" aria-hidden="true"><img src="/images/loading-kitty.svg" width="160" height="150" alt=""></span></div><div class="site-loader-meta"><span class="site-loader-message">Đang chuẩn bị trang web…</span><strong class="site-loader-percent">0%</strong></div><button class="site-loader-skip" type="button">Vào trang ngay →</button></div>`;

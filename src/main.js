@@ -164,7 +164,7 @@ async function loadPosts() {
     list.innerHTML = articleMarkup(post);
     document.querySelector(".page-hero")?.remove();
     document.title = `${post.title} | Locket Gold`;
-    document.querySelectorAll("[data-post-seo]").forEach((element) => element.remove());
+    document.querySelectorAll("[data-post-seo], [data-page-seo]").forEach((element) => element.remove());
     document.head.insertAdjacentHTML("beforeend", articleSeo(post).html);
     document.querySelector('link[rel="canonical"]')?.setAttribute("href", postUrl(post.slug));
     document.querySelector('meta[name="description"]')?.setAttribute("content", post.excerpt || post.title);

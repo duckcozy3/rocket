@@ -83,6 +83,7 @@ export async function postsResponse(request, env) {
   const display = postForDisplay(post);
   const seo = articleSeo(post);
   return finishHtml(request, response, new HTMLRewriter()
+    .on("[data-page-seo]", { element(element) { element.remove(); } })
     .on("head", { element(element) { element.append(seo.html, { html: true }); } })
     .on('link[rel="canonical"]', { element(element) { element.setAttribute("href", postUrl(slug)); } })
     .on("title", { element(element) { element.setInnerContent(`${display.title} | Locket Gold`); } })
