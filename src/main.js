@@ -9,6 +9,7 @@ import { normalizeUsername, parsePastedUsername } from "./username.js";
 import { DEFAULT_PLANS as fallbackPlans } from "./plans.js";
 import { postPurchaseState, apkInstallationGuide, goldCompletionGuide } from "./post-purchase.js";
 import { addAdminNoDns } from "./admin-nodns.js";
+import { addManualUpgradeForm } from "./admin-manual-upgrade.js";
 import { paymentQrUrl } from "./payment.js";
 import { addAdminSepay } from "./admin-sepay.js";
 import { addAdminGold } from "./admin-gold.js";
@@ -646,6 +647,7 @@ async function renderAdmin() {
   provider.innerHTML = `<h2>Kết nối NoDNS</h2><p>API cấp Gold: <strong>${integration.nodns_key ? "Đã cấu hình khóa" : "Chưa cấu hình khóa API"}</strong> · Cơ sở dữ liệu: <strong>${integration.database ? "Đã kết nối" : "Chưa kết nối"}</strong></p><p>CTV: ${integration.remote_ctv ? "Tài khoản và lượt trên NoDNS" : "Tài khoản và số dư trong cơ sở dữ liệu"}. Đơn khách lẻ, giá, bài viết và mã giảm giá được quản lý trong cơ sở dữ liệu của trang web.</p><button id="provider-refresh" class="button button--outline" type="button">Kiểm tra API và lịch sử cấp Gold</button><div id="provider-result" aria-live="polite"></div>`;
   dash.querySelector("#overview").after(provider);
   addProviderKeyForm(provider, api);
+  addManualUpgradeForm(provider, api);
   addAdminNoDns(dash, api, integration.remote_admin);
   addAdminSepay(dash, api, { escapeHtml, money });
   addAdminGold(dash, api, { escapeHtml });

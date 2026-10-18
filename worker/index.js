@@ -32,7 +32,7 @@ export default {
     try {
       if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: securityHeaders() });
       if (request.method !== "GET" && url.pathname !== "/api/sepay/webhook") assertSameOrigin(request, env);
-      if (["/api/public-config", "/api/sepay/webhook", "/api/ctv/orders", "/api/ctv/local/orders", "/api/admin/provider", "/api/admin/gold/cancel"].includes(url.pathname)) {
+      if (["/api/public-config", "/api/sepay/webhook", "/api/ctv/orders", "/api/ctv/local/orders", "/api/admin/provider", "/api/admin/gold/cancel", "/api/admin/provider/upgrade"].includes(url.pathname)) {
         if (url.pathname.startsWith("/api/admin/")) await requireSession(request, env, "admin");
         env = await resolveNoDnsEnv(env);
       }
@@ -100,6 +100,7 @@ async function route(request, env, ctx, url) {
   if (pathname === "/api/admin/images" && request.method === "POST") return uploadPostImage(request, env);
   if (pathname.startsWith("/api/images/") && request.method === "GET") return getPostImage(env, pathname.slice(12));
   if (pathname === "/api/admin/provider/key") return adminProviderKey(request, env);
+  if (pathname === "/api/admin/provider/upgrade" && request.method === "POST") return adminManualUpgrade(request, env);
   if (pathname === "/api/admin/sepay" && request.method === "GET") return adminSepay(request, env);
   if (pathname === "/api/admin/gold/cancel" && request.method === "POST") return adminCancelGold(request, env);
   if (pathname === "/api/admin/gold/cancellations" && request.method === "GET") {
@@ -520,6 +521,26 @@ async function adminProviderKey(request, env) {
   await env.DB.prepare("INSERT INTO provider_credentials (provider, encrypted_key, updated_by) VALUES ('nodns', ?, ?) ON CONFLICT(provider) DO UPDATE SET encrypted_key = excluded.encrypted_key, updated_by = excluded.updated_by, updated_at = CURRENT_TIMESTAMP")
     .bind(encrypted, String(admin.sub || "admin")).run();
   return json({ message: "Đã kiểm tra và lưu khóa API NoDNS mới.", account: { username: cleanText(account.username, 100), remaining: Number(account.remaining || 0) } });
+}
+
+async function adminManualUpgrade(request, env) {
+  const admin = await requireSession(request, env, "admin");
+  const input = await readJson(request);
+  const username = normalizeUsername(input.username);
+  if (!username) throw httpError(400, "Tên người dùng Locket không hợp lệ.");
+  const body = grantPayload({ username, plan_id: input.plan_id, platform: "iOS", code: `Admin: ${admin.sub}` });
+  if (!body) throw httpError(400, "Vui lòng chọn gói tháng, năm hoặc vĩnh viễn.");
+  const { result } = await providerRequest(env, "/api/v1/grant", { method: "POST", apiKey: true, body });
+  const uncertain = () => Object.assign(httpError(502, "Chưa xác nhận nâng cấp."), { publicMessage: "NoDNS chưa xác nhận đúng trạng thái hoặc thời hạn Gold. Kiểm tra lịch sử NoDNS trước khi thử lại." });
+  if (result.status !== "success" || unwrap(result).active !== true) throw uncertain();
+  let data = unwrap(result);
+  if (body.expiresAt && !sameGoldExpiry(data.expiresAt, body.expiresAt)) {
+    const { result: corrected } = await providerRequest(env, "/api/v1/update", { method: "POST", apiKey: true, body: { user: username, expiresAt: body.expiresAt } });
+    if (corrected.status !== "success" || !sameGoldExpiry(unwrap(corrected).expiresAt, body.expiresAt)) throw uncertain();
+    data = { ...data, expiresAt: unwrap(corrected).expiresAt };
+  }
+  if (!body.expiresAt && data.expiresAt !== null) throw uncertain();
+  return json({ username, plan_id: input.plan_id, expiresAt: data.expiresAt, remaining: Number.isFinite(data.remaining) ? data.remaining : null, message: "Đã nâng cấp Locket Gold thành công." });
 }
 
 async function adminCancelGold(request, env) {
