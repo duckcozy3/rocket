@@ -106,6 +106,22 @@ test("local CTV management creates protected accounts, sets individual prices, d
     assert.equal(sqlite.prepare("SELECT balance FROM ctv_users WHERE username = 'alice'").get().balance, 150000);
     assert.equal((await (await call("/api/ctv/me", ctv)).json()).user.available_credits, 6);
     const aliceId = list.ctv[0].id;
+    const adjustCredits = { id: aliceId, delta: 4 };
+    assert.equal((await call("/api/admin/ctv/credits", "", adjustCredits)).status, 401);
+    assert.equal((await call("/api/admin/ctv/credits", ctv, adjustCredits)).status, 401);
+    assert.equal((await call("/api/admin/ctv/credits", admin, adjustCredits, "https://other.example")).status, 403);
+    for (const delta of [0, -7, 1.5, null, true, "", 1000000001]) {
+      assert.equal((await call("/api/admin/ctv/credits", admin, { id: aliceId, delta })).status, 400);
+    }
+    assert.equal((await call("/api/admin/ctv/credits", admin, { id: 999, delta: 1 })).status, 404);
+    assert.equal((await call("/api/admin/ctv/credits", admin, adjustCredits)).status, 200);
+    assert.equal((await (await call("/api/ctv/me", ctv)).json()).user.available_credits, 10);
+    const adjustedList = await (await call("/api/admin/ctv", admin)).json();
+    assert.equal(adjustedList.ctv.find((user) => user.id === aliceId).available_credits, 10);
+    assert.equal(adjustedList.ctv.find((user) => user.username === "bob").available_credits, 0);
+    assert.equal((await call("/api/admin/ctv/credits", admin, { id: aliceId, delta: -4 })).status, 200);
+    assert.equal((await (await call("/api/ctv/me", ctv)).json()).user.available_credits, 6);
+    assert.equal(sqlite.prepare("SELECT balance FROM ctv_users WHERE id = ?").get(aliceId).balance, 150000);
     assert.equal((await call("/api/admin/ctv/prices", admin, { id: aliceId, unit_price: 90000 })).status, 200);
     assert.equal((await call("/api/ctv/credits/buy", ctv, { quantity: 100, request_id: "buy-credits-test-00002" })).status, 400);
     assert.equal(sqlite.prepare("SELECT COUNT(*) count FROM orders").get().count, 3);

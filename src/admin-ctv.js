@@ -11,6 +11,9 @@ export function addAdminCtv(dash, api, { escapeHtml: esc, money }) {
   const create = panel.querySelector("#admin-ctv-create");
   const edit = panel.querySelector("#admin-ctv-prices");
   const wallet = panel.querySelector("#admin-ctv-wallet");
+  wallet.insertAdjacentHTML("afterend", `<form id="admin-ctv-credits"><h2>Điều chỉnh số lượt</h2><label>Cộng tác viên<select name="id" required></select></label><p data-current-credits></p><label>Số lượt thay đổi<input name="delta" type="number" min="-1000000000" max="1000000000" step="1" required placeholder="10 để cộng, -10 để trừ"></label><button class="button" type="submit">Cập nhật số lượt</button><p class="form-message" aria-live="polite"></p></form>`);
+  const credits = panel.querySelector("#admin-ctv-credits");
+  const fillCredits = () => { credits.querySelector("[data-current-credits]").textContent = `Số lượt hiện có: ${accounts.find((user) => String(user.id) === credits.elements.id.value)?.available_credits ?? 0}`; };
   const fields = (price = "") => `<label>Giá 1 lượt (VNĐ)<input name="unit_price" type="number" min="0" max="100000000" step="1" value="${price}" required></label><p>1 tháng: 1 lượt · 1 năm: 1 lượt · Vĩnh viễn: 2 lượt. Giá áp dụng cho lần mua lượt tiếp theo. Lượt đã mua giữ nguyên.</p>`;
   const fillPrices = () => { edit.querySelector('[data-price-fields="edit"]').innerHTML = fields(accounts.find((user) => String(user.id) === edit.elements.id.value)?.unit_price ?? ""); };
   const refresh = async () => {
@@ -20,6 +23,11 @@ export function addAdminCtv(dash, api, { escapeHtml: esc, money }) {
     try {
       const data = await api("/api/admin/ctv");
       accounts = data.ctv;
+      const selectedCredits = credits.elements.id.value;
+      credits.elements.id.innerHTML = accounts.map((user) => `<option value="${user.id}">${esc(user.username)} — ${Number(user.available_credits || 0)} lượt</option>`).join("");
+      if (accounts.some((user) => String(user.id) === selectedCredits)) credits.elements.id.value = selectedCredits;
+      fillCredits();
+      credits.querySelector('[type="submit"]').disabled = !accounts.length;
       panel.querySelectorAll("[data-ctv-stat]").forEach((node) => { node.textContent = node.dataset.ctvStat === "balance" ? money(data.stats.balance) : Number(data.stats[node.dataset.ctvStat] || 0); });
       panel.querySelector("#admin-ctv-list").innerHTML = accounts.length ? `<div class="table-wrap"><table><thead><tr><th>STT</th><th>Tài khoản CTV</th><th>Đơn đã bán</th><th>Số dư ví</th><th>Giá 1 lượt</th><th>Thao tác</th></tr></thead><tbody>${accounts.map((user, index) => `<tr><td>${index + 1}</td><td>${esc(user.username)}</td><td>${user.sold_orders}</td><td>${money(user.balance)}</td><td data-ctv-price-cell>${money(user.unit_price)} / lượt</td><td><button type="button" class="button button--small button--outline" data-edit-ctv="${user.id}">Sửa giá 1 lượt</button><button type="button" class="button button--small button--outline" data-wallet-ctv="${user.id}">Số dư</button><button type="button" class="button button--small button--outline ctv-delete-button" data-delete-ctv="${user.id}">Xoá CTV</button></td></tr>`).join("")}</tbody></table></div>` : "<p>Chưa có cộng tác viên. Tạo tài khoản đầu tiên bên dưới.</p>";
       const selected = edit.elements.id.value;
@@ -81,6 +89,7 @@ export function addAdminCtv(dash, api, { escapeHtml: esc, money }) {
   const bind = (form, endpoint, body, after = () => {}) => form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const button = form.querySelector('[type="submit"]'); if (button.disabled) return;
+    if (form === credits && !window.confirm(`Xác nhận điều chỉnh ${Number(credits.elements.delta.value)} lượt cho ${accounts.find((user) => String(user.id) === credits.elements.id.value)?.username}?`)) return;
     if (form === wallet && !window.confirm(`Xác nhận điều chỉnh ${money(Number(wallet.elements.delta.value))} cho ${wallet.elements.username.value}?`)) return;
     button.disabled = true;
     const message = form.querySelector(".form-message");
@@ -92,6 +101,8 @@ export function addAdminCtv(dash, api, { escapeHtml: esc, money }) {
   bind(edit, "/api/admin/ctv/prices", () => ({ id: edit.elements.id.value, unit_price: edit.elements.unit_price.value }));
   bind(wallet, "/api/admin/ctv/balance", () => ({ username: wallet.elements.username.value, delta: wallet.elements.delta.value }), () => { wallet.elements.delta.value = ""; });
   edit.elements.id.addEventListener("change", fillPrices);
+  bind(credits, "/api/admin/ctv/credits", () => ({ id: credits.elements.id.value, delta: credits.elements.delta.value }), () => { credits.elements.delta.value = ""; });
+  credits.elements.id.addEventListener("change", fillCredits);
   panel.querySelector("#admin-ctv-refresh").addEventListener("click", refresh);
   panel.addEventListener("ctv-refresh", refresh);
   refresh();

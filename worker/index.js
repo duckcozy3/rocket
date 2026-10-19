@@ -118,6 +118,7 @@ async function route(request, env, ctx, url) {
   if (pathname === "/api/admin/ctv" && request.method === "GET") return adminListCtv(request, env);
   if (pathname === "/api/admin/ctv/prices" && request.method === "POST") return adminCtvPrices(request, env);
   if (pathname === "/api/admin/ctv/balance" && request.method === "POST") return adminUpdateCtvBalance(request, env);
+  if (pathname === "/api/admin/ctv/credits" && request.method === "POST") return adminUpdateCtvCredits(request, env);
   const deleteCtv = pathname.match(/^\/api\/admin\/ctv\/(\d+)$/);
   if (deleteCtv && request.method === "DELETE") {
     await requireSession(request, env, "admin"); requireDb(env);
@@ -754,6 +755,7 @@ async function ctvPrices(env, id) {
 
 async function adminListCtv(request, env) {
   await requireSession(request, env, "admin"); requireDb(env);
+  await ensureCtvCredits(env, 0);
   const [{ results: users }, { results: stored }, plansResponse] = await Promise.all([
     env.DB.prepare("SELECT c.id, c.username, c.balance, c.created_at, (SELECT COUNT(*) FROM orders o WHERE o.ctv_id = c.id AND o.status IN ('paid','completed')) AS sold_orders FROM ctv_users c WHERE c.active = 1 ORDER BY c.id").all(),
     env.DB.prepare("SELECT key, value FROM settings WHERE key LIKE 'ctv_prices:%'").all(),
@@ -762,7 +764,9 @@ async function adminListCtv(request, env) {
   const { plans } = await plansResponse.json();
   const prices = new Map((stored || []).map((row) => [row.key, validateCtvPrices(JSON.parse(row.value))]));
   const defaultUnitPrice = plans.find((plan) => plan.id === "ios-month")?.price ?? DEFAULT_PLANS[0].price;
-  const ctv = (users || []).map((user) => ({ ...user, balance: Number(user.balance), sold_orders: Number(user.sold_orders), unit_price: ctvUnitPrice(prices.get(`ctv_prices:${user.id}`) || {}, defaultUnitPrice) }));
+  const { results: wallets } = await env.DB.prepare("SELECT ctv_id, credits FROM ctv_credits").all();
+  const credits = new Map((wallets || []).map((row) => [row.ctv_id, Number(row.credits)]));
+  const ctv = (users || []).map((user) => ({ ...user, available_credits: credits.get(user.id) || 0, balance: Number(user.balance), sold_orders: Number(user.sold_orders), unit_price: ctvUnitPrice(prices.get(`ctv_prices:${user.id}`) || {}, defaultUnitPrice) }));
   return json({ ctv, plans: plans.filter((plan) => plan.platform === "iOS"), stats: { count: ctv.length, sold_orders: ctv.reduce((total, user) => total + user.sold_orders, 0), balance: ctv.reduce((total, user) => total + user.balance, 0) } });
 }
 
@@ -775,6 +779,19 @@ async function adminCtvPrices(request, env) {
   if (!await env.DB.prepare("SELECT id FROM ctv_users WHERE id = ? AND active = 1").bind(id).first()) throw httpError(404, "Không tìm thấy CTV.");
   await env.DB.prepare("INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP").bind(`ctv_prices:${id}`, JSON.stringify(prices)).run();
   return json({ message: "Đã lưu giá 1 lượt cho CTV. Các đơn đã tạo giữ nguyên số tiền." });
+}
+
+async function adminUpdateCtvCredits(request, env) {
+  await requireSession(request, env, "admin"); requireDb(env);
+  const body = await readJson(request);
+  const id = Number(body.id);
+  const delta = Number(body.delta);
+  if (!Number.isSafeInteger(id) || id < 1 || !["number", "string"].includes(typeof body.delta) || !Number.isSafeInteger(delta) || delta === 0 || Math.abs(delta) > 1_000_000_000) throw httpError(400, "CTV hoặc số lượt thay đổi không hợp lệ.");
+  if (!await env.DB.prepare("SELECT id FROM ctv_users WHERE id = ? AND active = 1").bind(id).first()) throw httpError(404, "Không tìm thấy CTV.");
+  await ensureCtvCredits(env, id);
+  const result = await env.DB.prepare("UPDATE ctv_credits SET credits = credits + ? WHERE ctv_id = ? AND credits + ? BETWEEN 0 AND 1000000000 AND EXISTS (SELECT 1 FROM ctv_users WHERE id = ? AND active = 1)").bind(delta, id, delta, id).run();
+  if (!result.meta?.changes) throw httpError(400, "Số lượt sau điều chỉnh phải từ 0 đến 1.000.000.000. Vui lòng làm mới và thử lại.");
+  return json({ message: "Đã cập nhật số lượt CTV." });
 }
 
 async function adminUpdateCtvBalance(request, env) {
