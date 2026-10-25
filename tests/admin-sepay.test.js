@@ -27,6 +27,7 @@ test("SePay admin shows matched orders and diagnostics without exposing raw payl
   assert.equal(response.status, 200);
   const result = await response.json();
   assert.equal(result.config.key_configured, true);
+  assert.deepEqual(result.config.payment_code_rules.map((rule) => rule.prefix), ["LG", "LGNAP"]);
   assert.equal(result.config.webhook_url, `${site}/api/sepay/webhook`);
   assert.equal(result.transactions[0].order_status, "completed");
   assert.equal(result.transactions[0].reference, "FT123");

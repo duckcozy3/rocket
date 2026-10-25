@@ -119,6 +119,8 @@ try {
 
 ## Cấu hình SePay
 
+Mã thanh toán có hai cấu trúc cần khai báo: đơn Gold dùng tiền tố `LG` (ví dụ `LG12345678`), nạp ví CTV dùng `LGNAP` (ví dụ `LGNAP12345678`). Cả hai có hậu tố đúng 8 ký tự A–Z hoặc 0–9, viết liền. Khai báo đủ hai cấu trúc trước khi bật lọc webhook theo mã; nếu có thứ tự ưu tiên, đặt `LGNAP` trước `LG`. Mục **Giao dịch SePay** trong admin hiển thị các cấu trúc này. Worker chỉ đối chiếu mã nguyên vẹn, không lấy mã con trong chuỗi chữ/số dài hơn; giao dịch chứa nhiều mã khác nhau được giữ để đối soát, không tự xác nhận hoặc cộng ví.
+
 Trong SePay, tạo webhook cho giao dịch tiền vào:
 
 - URL: `https://locketgold.info/api/sepay/webhook`

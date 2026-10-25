@@ -1,4 +1,5 @@
 const outcomes = {
+  ambiguous_payment_code: "Nhiều mã thanh toán · cần đối soát",
   ctv_topup_credited: "Đã cộng ví CTV", ctv_topup_wrong_amount: "Nạp CTV sai số tiền · cần đối soát", ctv_topup_not_found: "Không tìm thấy mã nạp CTV", ctv_topup_already_paid: "Yêu cầu nạp CTV đã xử lý",
   ctv_topup_ambiguous: "Nhiều mã nạp CTV · cần đối soát", ctv_account_inactive: "Tài khoản CTV không hoạt động",
   matched: "Đã khớp thanh toán", underpaid: "Thiếu tiền", no_order_code: "Không có mã đơn",
@@ -35,8 +36,10 @@ export function addAdminSepay(dash, api, { escapeHtml: esc, money }) {
     try {
       const { config, summary, transactions } = await api("/api/admin/sepay");
       rows = transactions;
+      const codeGuide = `<p><strong>Cấu trúc mã chuyển khoản để cài trong SePay</strong></p><ul>${config.payment_code_rules.map((rule) => `<li>${esc(rule.purpose)}: tiền tố <code>${esc(rule.prefix)}</code>, hậu tố đúng ${Number(rule.suffix_length)} ký tự A–Z hoặc 0–9. Ví dụ: <code>${esc(rule.example)}</code>.</li>`).join("")}</ul><p>Khai báo đủ hai cấu trúc trước khi bật lọc webhook theo mã. Nếu có thứ tự ưu tiên, đặt LGNAP trước LG. Nội dung chuyển khoản viết liền, giữ nguyên mã trên QR. Mã nằm trong chuỗi chữ/số dài hơn hoặc giao dịch chứa nhiều mã sẽ không được tự xác nhận.</p>`;
       panel.querySelector("[data-sepay-config]").innerHTML = `<p>Khóa thông báo giao dịch: <strong>${config.key_configured ? "Đã cấu hình" : "Chưa cấu hình"}</strong> · ${esc(config.bank_name)} · STK <strong>${esc(config.bank_account || "Chưa cấu hình")}</strong></p><p>Địa chỉ nhận thông báo giao dịch: <code>${esc(config.webhook_url)}</code></p><p>Tổng giao dịch đã ghi nhận: <strong>${Number(summary.total)}</strong> · Tiền đã khớp đơn: <strong>${money(summary.matched_amount)}</strong><br>Thông báo giao dịch gần nhất: ${esc(date(summary.last_received))}</p><p>Chọn sự kiện Có tiền vào, xác thực khóa API và tiền tố mã đơn LG trong SePay. Có khóa trên trang web chưa xác nhận thông báo giao dịch bên SePay đã được bật.</p>`;
       render();
+      panel.querySelector("[data-sepay-config]").insertAdjacentHTML("beforeend", codeGuide);
       message.textContent = `Đã kiểm tra lúc ${new Date().toLocaleTimeString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}.`;
       message.className = "form-message is-success";
     } catch (error) { message.textContent = error.message; message.className = "form-message is-error"; }

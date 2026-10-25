@@ -1,3 +1,4 @@
+import { extractPaymentCodes, paymentCodeRules } from "../src/payment-codes.js";
 import { normalizeUsername } from "../src/username.js";
 import { adminRevenue } from "./admin-revenue.js";
 import { ctvCredits, ctvUnitPrice } from "../src/ctv-pricing.js";
@@ -300,14 +301,14 @@ async function sepayWebhook(request, env, ctx) {
   if (!Number.isFinite(Number(payload.transferAmount)) || Number(payload.transferAmount) < 0) throw httpError(400, "Số tiền giao dịch không hợp lệ.");
   const transactionId = String(payload.id || "");
   if (!transactionId) throw httpError(400, "Thiếu mã giao dịch.");
-  const content = `${payload.code || ""} ${payload.content || ""} ${payload.description || ""}`.toUpperCase();
-  const topupCode = content.match(/LGNAP[A-Z0-9]{8}/)?.[0];
+  const codes = extractPaymentCodes(payload);
+  const topupCode = codes.length === 1 && codes[0].startsWith("LGNAP") ? codes[0] : null;
   if (topupCode) {
     if (!Number.isSafeInteger(Number(payload.transferAmount))) throw httpError(400, "Số tiền giao dịch không hợp lệ.");
     await creditCtvTopup(env, payload, topupCode);
     return json({ success: true });
   }
-  const code = content.match(/LG[A-Z0-9]{8}/)?.[0];
+  const code = codes.length === 1 ? codes[0] : null;
 
   const inserted = await env.DB.prepare("INSERT OR IGNORE INTO payment_events (provider, transaction_id, amount, payload_json, outcome) VALUES ('sepay', ?, ?, ?, 'received')")
     .bind(transactionId, Number(payload.transferAmount), JSON.stringify(payload).slice(0, 20000)).run();
@@ -320,6 +321,7 @@ async function sepayWebhook(request, env, ctx) {
   };
   if (payload.transferType !== "in") return finish("outgoing");
   if (env.BANK_ACCOUNT && String(payload.accountNumber || "").trim() !== env.BANK_ACCOUNT) return finish("wrong_account");
+  if (codes.length > 1) return finish("ambiguous_payment_code");
   if (!code) return finish("no_order_code");
 
   await expirePendingOrders(env);
@@ -571,7 +573,7 @@ async function adminSepay(request, env) {
     env.DB.prepare("SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN outcome = 'matched' THEN amount ELSE 0 END), 0) AS matched_amount, MAX(created_at) AS last_received FROM payment_events WHERE provider = 'sepay'").first(),
   ]);
   return json({
-    config: { webhook_url: `${new URL(env.SITE_URL || request.url).origin}/api/sepay/webhook`, key_configured: Boolean(env.SEPAY_WEBHOOK_API_KEY), bank_name: env.BANK_NAME || "", bank_account: env.BANK_ACCOUNT || "" },
+    config: { payment_code_rules: paymentCodeRules, webhook_url: `${new URL(env.SITE_URL || request.url).origin}/api/sepay/webhook`, key_configured: Boolean(env.SEPAY_WEBHOOK_API_KEY), bank_name: env.BANK_NAME || "", bank_account: env.BANK_ACCOUNT || "" },
     summary: summary || { total: 0, matched_amount: 0, last_received: null },
     transactions: (results || []).map((row) => {
       let payload = {};

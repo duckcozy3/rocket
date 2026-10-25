@@ -1,3 +1,4 @@
+import { extractPaymentCodes } from "../src/payment-codes.js";
 // IF NOT EXISTS also makes the tracked migration safe to apply after first use.
 const schema = "CREATE TABLE IF NOT EXISTS ctv_topups (code TEXT PRIMARY KEY, ctv_id INTEGER NOT NULL REFERENCES ctv_users(id), amount INTEGER NOT NULL CHECK(amount > 0), unit_price INTEGER NOT NULL CHECK(unit_price > 0), credits INTEGER NOT NULL CHECK(credits > 0), status TEXT NOT NULL DEFAULT 'pending', payment_ref TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, paid_at TEXT)";
 export async function ensureCtvTopups(env) { await env.DB.prepare(schema).run(); }
@@ -32,7 +33,7 @@ export async function creditCtvTopup(env, payload, code) {
   const transaction = String(payload.id);
   const amount = Number(payload.transferAmount);
   const topup = await env.DB.prepare("SELECT * FROM ctv_topups WHERE code = ?").bind(code).first();
-  const codes = new Set(`${payload.code || ""} ${payload.content || ""} ${payload.description || ""}`.toUpperCase().match(/LGNAP[A-Z0-9]{8}/g) || []);
+  const codes = new Set(extractPaymentCodes(payload));
   let outcome;
   if (codes.size > 1) outcome = "ctv_topup_ambiguous";
   else if (payload.transferType !== "in") outcome = "outgoing";
