@@ -45,7 +45,12 @@ test("sitemap omits invalid slugs and dates and does not invent modification tim
   assert.ok(!xml.includes("secret"));
   assert.ok(!xml.includes("2026-02-30"));
   assert.match(xml, /<lastmod>2026-10-04<\/lastmod>/);
-  assert.equal((xml.match(/<lastmod>/g) || []).length, 1);
+  assert.equal((xml.match(/<lastmod>/g) || []).length, PUBLIC_PATHS.length + 1);
+  assert.match(xml, /xmlns:xhtml="http:\/\/www.w3.org\/1999\/xhtml"/);
+  assert.match(xml, /<loc>https:\/\/locketgold.info\/<\/loc>\n    <lastmod>2026-10-17<\/lastmod>\n    <changefreq>daily<\/changefreq>\n    <priority>1.0000<\/priority>/);
+  assert.equal((xml.match(/<changefreq>daily<\/changefreq>/g) || []).length, PUBLIC_PATHS.length + 2);
+  assert.equal((xml.match(/<priority>0.9000<\/priority>/g) || []).length, PUBLIC_PATHS.length - 1);
+  assert.equal((xml.match(/<priority>0.8000<\/priority>/g) || []).length, 2);
 });
 
 test("sitemap supports HEAD and refuses mutations", async () => {

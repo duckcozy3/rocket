@@ -32,7 +32,7 @@ export async function sitemapResponse(request, env) {
       const fallback = await env.ASSETS.fetch(new Request(new URL("/sitemap-static.xml", request.url)));
       if (fallback.ok && /(?:application|text)\/xml/i.test(fallback.headers.get("Content-Type") || "")) {
         const xml = await fallback.text();
-        if (xml.includes('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">') && xml.includes("</urlset>")) {
+        if (/<urlset\s[^>]*xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9"[^>]*>/.test(xml) && xml.includes("</urlset>")) {
           return new Response(request.method === "HEAD" ? null : xml, { headers: {
             "Content-Type": "application/xml; charset=utf-8",
             "Cache-Control": "public, max-age=60",
