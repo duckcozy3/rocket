@@ -55,7 +55,15 @@ export async function postsResponse(request, env) {
   if (!url.searchParams.has("bai")) {
     const [archive, live] = await Promise.all([
       assetJson(request, env, "/imported-posts/index.json"),
-      env.DB ? env.DB.prepare("SELECT slug, title, excerpt, published_at FROM posts WHERE status = 'published' ORDER BY published_at DESC").all() : { results: [] },
+      (async () => {
+        if (!env.DB) return { results: [] };
+        try {
+          return await env.DB.prepare("SELECT slug, title, excerpt, published_at FROM posts WHERE status = 'published' ORDER BY published_at DESC").all();
+        } catch (error) {
+          console.error("Post database unavailable; serving bundled archive", error);
+          return { results: [], unavailable: true };
+        }
+      })(),
     ]);
     if (!Array.isArray(archive)) throw new Error("Invalid post archive");
     const view = archiveView(mergePostArchive([...(live.results || []), ...FALLBACK_POSTS], archive), url.searchParams.get("trang"));
@@ -64,18 +72,28 @@ export async function postsResponse(request, env) {
       .on("title", { element(element) { element.setInnerContent(`Bài viết Locket Gold${view.page > 1 ? ` – Trang ${view.page}` : ""} | Hướng dẫn & mẹo sử dụng`); } })
       .on('link[rel="canonical"]', { element(element) { element.setAttribute("href", canonical); } })
       .on("#post-list", { element(element) { element.setInnerContent(view.cards, { html: true }); element.after(view.controls, { html: true }); } })
-      .on(".post-archive-controls", { element(element) { element.remove(); } }));
+      .on(".post-archive-controls", { element(element) { element.remove(); } }), live.unavailable);
   }
   const slug = url.searchParams.get("bai");
   let post;
+  let databaseUnavailable = false;
   if (/^[a-z0-9-]{1,200}$/.test(slug)) {
-    if (env.DB) post = await env.DB.prepare("SELECT slug, title, excerpt, content, published_at FROM posts WHERE slug = ? AND status = 'published'").bind(slug).first();
+    if (env.DB) {
+      try {
+        post = await env.DB.prepare("SELECT slug, title, excerpt, content, published_at FROM posts WHERE slug = ? AND status = 'published'").bind(slug).first();
+      } catch (error) {
+        databaseUnavailable = true;
+        console.error("Post database unavailable; trying bundled article", error);
+      }
+    }
     if (!post) {
       try { post = await assetJson(request, env, `/imported-posts/${slug}.json`); } catch { /* Try the built-in articles below. */ }
     }
     if (!post?.title) post = FALLBACK_POSTS.find((item) => item.slug === slug);
   }
   if (!post?.title) {
+    // A database-only article may still exist. Do not cache a false 404 during an outage.
+    if (databaseUnavailable) return new Response("Bài viết tạm thời chưa tải được. Vui lòng thử lại sau.", { status: 503, headers: { "Retry-After": "60", "Cache-Control": "no-store" } });
     const headers = new Headers(response.headers);
     headers.set("X-Robots-Tag", "noindex");
     return new Response(request.method === "HEAD" ? null : response.body, { status: 404, headers });
@@ -94,14 +112,14 @@ export async function postsResponse(request, env) {
       element.setAttribute("class", "article-view");
       element.setAttribute("data-rendered-post", slug);
       element.setInnerContent(articleMarkup(post), { html: true });
-    } }));
+    } }), databaseUnavailable);
 }
 
-function finishHtml(request, response, rewriter) {
+function finishHtml(request, response, rewriter, degraded = false) {
   const headers = new Headers(response.headers);
   headers.delete("ETag");
   headers.delete("Last-Modified");
-  headers.set("Cache-Control", "public, max-age=300");
+  headers.set("Cache-Control", degraded ? "no-store" : "public, max-age=300");
   if (request.method === "HEAD") return new Response(null, { status: response.status, headers });
   return rewriter.transform(new Response(response.body, { status: response.status, headers }));
 }
