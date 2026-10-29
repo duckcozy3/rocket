@@ -1,6 +1,6 @@
 const statuses = { active: "Đang hoạt động", expired: "Đã hết hạn", cancelled: "Đã hủy" };
-export function addAdminPromos(dash, api, { escapeHtml: esc, money }) {
-  const panel = dash.querySelector("#promos"), form = panel.querySelector("form");
+export function addAdminPromos(dash, api, { escapeHtml: esc, money, panelId = "promos", endpoint = "/api/admin/promos" }) {
+  const panel = dash.querySelector(`#${panelId}`), form = panel.querySelector("form");
   form.removeAttribute("data-admin-endpoint");
   form.querySelector('input[name="code"]').pattern = "[A-Za-z0-9_-]{1,32}";
   form.querySelector('input[name="expires_at"]').closest("label").firstChild.textContent = "Ngày hết hạn (giờ Việt Nam)";
@@ -21,7 +21,7 @@ export function addAdminPromos(dash, api, { escapeHtml: esc, money }) {
     if (refreshButton.disabled) return;
     refreshButton.disabled = true;
     try {
-      const { promos, summary } = await api("/api/admin/promos"); rows = promos;
+      const { promos, summary } = await api(endpoint); rows = promos;
       list.querySelector("[data-promo-summary]").innerHTML = [["Tổng số mã",summary.total],["Đang hoạt động",summary.active],["Đã hết hạn",summary.expired],["Đã hủy",summary.cancelled]].map(([label,value])=>`<article><span>${label}</span><strong>${Number(value)}</strong></article>`).join("");
       render();
     } catch(error) { message.textContent = error.message; message.className = "form-message is-error"; }
@@ -37,7 +37,7 @@ export function addAdminPromos(dash, api, { escapeHtml: esc, money }) {
     const code = button.dataset.promoCancel;
     if (!window.confirm(`Hủy mã ${code}? Các đơn đã tạo giữ nguyên số tiền.`)) return;
     button.disabled = true;
-    try { const result = await api("/api/admin/promos/cancel", { method: "POST", body: JSON.stringify({ code }) }); message.textContent = result.message; message.className = "form-message is-success"; await refresh(); }
+    try { const result = await api(`${endpoint}/cancel`, { method: "POST", body: JSON.stringify({ code }) }); message.textContent = result.message; message.className = "form-message is-success"; await refresh(); }
     catch(error) { message.textContent = error.message; message.className = "form-message is-error"; }
     finally { button.disabled = false; }
   });
@@ -48,7 +48,7 @@ export function addAdminPromos(dash, api, { escapeHtml: esc, money }) {
     try {
       const values = Object.fromEntries(new FormData(form));
       if (values.expires_at) values.expires_at = new Date(`${values.expires_at}${values.expires_at.length === 16 ? ":00" : ""}+07:00`).toISOString();
-      const result = await api("/api/admin/promos", { method: "POST", body: JSON.stringify(values) });
+      const result = await api(endpoint, { method: "POST", body: JSON.stringify(values) });
       formMessage.textContent = result.message; formMessage.className = "form-message is-success"; form.reset(); await refresh();
     } catch(error) { formMessage.textContent = error.message; formMessage.className = "form-message is-error"; }
     finally { save.disabled = false; }

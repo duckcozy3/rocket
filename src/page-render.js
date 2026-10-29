@@ -2,6 +2,7 @@ import { DEFAULT_PLANS as fallbackPlans } from "./plans.js";
 import { FALLBACK_POSTS as fallbackPosts } from "./fallback-posts.js";
 import { welcomeMarkup } from "./welcome-notice.js";
 import { postCards, formatDate } from "./post-view.js";
+import { spotifyPage } from "./spotify.js";
 
 export function createPageRenderer(page, search = "") {
   const defaultDnsUrl = "https://ctv.nodns.vn/cai-dns";
@@ -10,6 +11,7 @@ export function createPageRenderer(page, search = "") {
   const navItems = [
     ["home", "/", "Trang chủ", "⌂"],
     ["pricing", "/len-gold/", "Lên Gold", "♛"],
+    ["spotify", "/spotify/", "Spotify", "♫"],
     ["trust", "/uy-tin/", "Uy tín", "✧"],
     ["posts", "/bai-viet/", "Bài viết", "▤"],
     ["guide", "/huong-dan/", "Hướng dẫn", "▣"],
@@ -34,6 +36,7 @@ export function createPageRenderer(page, search = "") {
     const paths = {
       home: '<path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-7h6v7"/>',
       pricing: '<path d="m3 6 4 4 5-7 5 7 4-4-3 12H6z"/><path d="M6 21h12"/>',
+      spotify: '<path d="M9 18V5l12-2v13M9 9l12-2"/><ellipse cx="6" cy="18" rx="3" ry="3"/><ellipse cx="18" cy="16" rx="3" ry="3"/>',
       trust: '<path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6z"/><path d="m8 12 3 3 5-6"/>',
       posts: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
       guide: '<path d="M12 5v16M3 4h5l4 2 4-2h5v15h-5l-4 2-4-2H3z"/>',
@@ -59,7 +62,7 @@ export function createPageRenderer(page, search = "") {
   }
 
   function header() {
-    const links = navItems.map(([key, href, label]) => `<a href="${href}" class="${page === key ? "is-active" : ""} ${key === "pricing" ? "nav-link--gold" : ""}" ${page === key ? 'aria-current="page"' : ""}><span class="nav-icon" aria-hidden="true">${navIcon(key)}</span><span>${label}</span>${key === "pricing" ? '<em>BÁN CHẠY</em>' : ""}</a>`).join("");
+    const links = navItems.map(([key, href, label]) => `<a href="${href}" class="${page === key ? "is-active" : ""} ${key === "pricing" ? "nav-link--gold" : key === "spotify" ? "nav-link--spotify" : ""}" ${page === key ? 'aria-current="page"' : ""}><span class="nav-icon" aria-hidden="true">${navIcon(key)}</span><span>${label}</span>${key === "pricing" ? '<em>BÁN CHẠY</em>' : ""}</a>`).join("");
     return `<header class="site-header"><div class="container nav-wrap">${brand(true)}
       <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-nav" aria-label="Mở menu"><span></span><span></span><span></span></button>
       <nav class="main-nav" id="main-nav" aria-label="Điều hướng chính"><div class="nav-drawer-heading"><div><strong>Khám phá Locket Gold</strong><small>locketgold.info</small></div><button class="nav-close" type="button" aria-label="Đóng menu">×</button></div>${links}</nav>
@@ -108,6 +111,7 @@ export function createPageRenderer(page, search = "") {
   }
 
   const pages = {
+    spotify: () => publicShell(spotifyPage()),
     home: () => publicShell(`<section class="hero"><div class="container hero-grid">
       <div class="hero-copy"><span class="eyebrow"><span aria-hidden="true">♡</span> Không cần chia sẻ mật khẩu<span class="hero-bow hero-bow--badge" aria-hidden="true">${heroBow()}</span></span><h1><span class="hero-title-line">Nâng trải nghiệm</span><span class="hero-title-line"><span class="hero-title-gold">Locket Gold<span class="hero-bow hero-bow--title" aria-hidden="true">${heroBow()}</span>,</span> giữ</span><span class="hero-title-line">trọn khoảnh khắc</span><span class="hero-heart hero-heart--one" aria-hidden="true">${heroHeart()}</span><span class="hero-heart hero-heart--two" aria-hidden="true">${heroHeart()}</span><span class="hero-heart hero-heart--three" aria-hidden="true">${heroHeart()}</span></h1><p>Chọn gói, nhập Tên người dùng và theo dõi đơn trên web. Hỗ trợ iPhone và Android.</p><div class="hero-actions"><a class="button" href="/len-gold/"><span class="hero-bow hero-bow--button" aria-hidden="true">${heroBow()}</span>Chọn gói Gold →</a><a class="button button--outline" href="/huong-dan/">Xem hướng dẫn <span class="hero-button-heart" aria-hidden="true">♥</span></a></div><div class="safe-note"><b>✓</b><span><strong>Quyền riêng tư là ưu tiên</strong><small>Không nhập mật khẩu, OTP hoặc mã khôi phục.</small></span></div></div>
       <div class="hero-art"><span class="float-chip float-chip--top">✓ Chỉ cần Tên người dùng</span><img src="/images/banner-locketpro.webp" alt="Banner Locket Gold tông hồng với các nhân vật mèo dễ thương" width="1536" height="1024" fetchpriority="high"><span class="float-chip float-chip--bottom">♡ Hỗ trợ iOS & Android</span></div>

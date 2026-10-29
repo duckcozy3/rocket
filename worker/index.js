@@ -10,6 +10,7 @@ import { adminCredential, passwordHash, verifyAdminPassword } from "./admin-acco
 import { DEFAULT_WELCOME, validateWelcome } from "../src/welcome-notice.js";
 import { downloadAndroidApk } from "./android-apk.js";
 import { sitemapResponse, postsResponse } from "./seo.js";
+import { spotifyApi, activateSpotifyOrder } from "./spotify.js";
 import { providerRequest, unwrap, grantPayload, remoteCookie, remoteLogin, clearRemoteCookie, publicCtv, portalOrders, resolveNoDnsEnv, encryptNoDnsKey, sameGoldExpiry, purchasedGoldExpiry, providerGoldOrder } from "./nodns.js";
 
 const loginAttempts = new Map();
@@ -49,6 +50,11 @@ export default {
 
 async function route(request, env, ctx, url) {
   const { pathname } = url;
+  if (pathname.startsWith("/api/spotify/") || pathname.startsWith("/api/admin/spotify/")) {
+    if (pathname.startsWith("/api/admin/")) await requireSession(request, env, "admin");
+    rateLimit(request, "spotify", 60, 60_000);
+    return spotifyApi(request, env, ctx, { readJson, transferDetails, randomCode, activateOrder });
+  }
   // Accounts created in this site's admin always use D1, regardless of legacy NoDNS mode.
   if (pathname.startsWith("/api/ctv/local/")) {
     const localUrl = new URL(url);
@@ -372,6 +378,7 @@ export async function repairQueuedGoldExpiries(env) {
 }
 
 async function activateOrder(env, order) {
+  if (order.platform === "Spotify") return activateSpotifyOrder(env, order);
   if (env.NODNS_API_KEY) {
     const body = grantPayload(order);
     if (!body) return;
@@ -651,7 +658,7 @@ export function promoStatus(promo, now = Date.now()) {
 
 async function adminListPromos(request, env) {
   await requireSession(request, env, "admin"); requireDb(env);
-  const { results } = await env.DB.prepare("SELECT p.code, p.percent, p.active, p.expires_at, p.created_at, COALESCE(u.paid_orders, 0) AS paid_orders, COALESCE(u.discount_total, 0) AS discount_total FROM promo_codes p LEFT JOIN (SELECT promo_code, COUNT(*) AS paid_orders, SUM(discount_amount) AS discount_total FROM orders WHERE status IN ('paid', 'completed') GROUP BY promo_code) u ON u.promo_code = p.code ORDER BY p.created_at DESC, p.code ASC").all();
+  const { results } = await env.DB.prepare("SELECT p.code, p.percent, p.active, p.expires_at, p.created_at, COALESCE(u.paid_orders, 0) AS paid_orders, COALESCE(u.discount_total, 0) AS discount_total FROM promo_codes p LEFT JOIN (SELECT promo_code, COUNT(*) AS paid_orders, SUM(discount_amount) AS discount_total FROM orders WHERE status IN ('paid', 'completed') AND platform <> 'Spotify' GROUP BY promo_code) u ON u.promo_code = p.code ORDER BY p.created_at DESC, p.code ASC").all();
   const promos = (results || []).map(row => ({ ...row, status: promoStatus(row) }));
   return json({ promos, summary: { total: promos.length, active: promos.filter(p => p.status === "active").length, expired: promos.filter(p => p.status === "expired").length, cancelled: promos.filter(p => p.status === "cancelled").length } });
 }

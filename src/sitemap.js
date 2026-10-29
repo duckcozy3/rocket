@@ -1,7 +1,7 @@
 import { mergePostArchive } from "./post-archive.js";
 
 export const SITE_URL = "https://locketgold.info";
-export const PUBLIC_PATHS = ["/", "/len-gold/", "/uy-tin/", "/bai-viet/", "/huong-dan/", "/cong-tac-vien/", "/lien-he/", "/tai-dns/"];
+export const PUBLIC_PATHS = ["/", "/len-gold/", "/spotify/", "/uy-tin/", "/bai-viet/", "/huong-dan/", "/cong-tac-vien/", "/lien-he/", "/tai-dns/"];
 // Last recorded changes to the public page files in repository history.
 const PAGE_LASTMOD = "2026-10-17";
 
@@ -24,7 +24,7 @@ function publicationDate(value) {
 export function sitemapXml(existing = [], imported = []) {
   const entries = PUBLIC_PATHS.map((path) => ({
     url: `${SITE_URL}${path}`,
-    lastmod: PAGE_LASTMOD,
+    lastmod: path === "/spotify/" ? "2026-10-30" : PAGE_LASTMOD,
     priority: path === "/" ? "1.0000" : "0.9000",
   }));
   for (const post of mergePostArchive(existing, imported)) {

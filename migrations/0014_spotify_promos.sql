@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS spotify_promo_codes (
+  code TEXT PRIMARY KEY,
+  percent INTEGER NOT NULL CHECK (percent BETWEEN 1 AND 100),
+  expires_at TEXT,
+  active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0,1)),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

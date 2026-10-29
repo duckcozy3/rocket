@@ -1,6 +1,7 @@
 # Copy to .dev.vars for local Wrangler. Never commit actual keys.
 SESSION_SECRET=
 NODNS_API_KEY=
+SPOTIFY_PROFILE_URL=http://103.101.161.228:8082/spotify-mitm.mobileconfig
 SEPAY_WEBHOOK_API_KEY=
 BANK_NAME="MB Bank"
 BANK_BIN=970422

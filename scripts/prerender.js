@@ -6,6 +6,7 @@ import { FALLBACK_POSTS } from "../src/fallback-posts.js";
 
 const pages = { "index.html": "home", "len-gold/index.html": "pricing", "uy-tin/index.html": "trust", "bai-viet/index.html": "posts", "huong-dan/index.html": "guide", "cong-tac-vien/index.html": "ctv", "lien-he/index.html": "contact", "tai-dns/index.html": "dns" };
 const archive = JSON.parse(await readFile(new URL("../public/imported-posts/index.json", import.meta.url), "utf8"));
+pages["spotify/index.html"] = "spotify";
 for (const [path, page] of Object.entries(pages)) {
   const file = new URL(`../dist/${path}`, import.meta.url);
   let content = createPageRenderer(page).render();

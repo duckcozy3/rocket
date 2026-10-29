@@ -8,6 +8,7 @@ export default defineConfig({
       input: {
         home: resolve(import.meta.dirname, "index.html"),
         pricing: resolve(import.meta.dirname, "len-gold/index.html"),
+        spotify: resolve(import.meta.dirname, "spotify/index.html"),
         trust: resolve(import.meta.dirname, "uy-tin/index.html"),
         posts: resolve(import.meta.dirname, "bai-viet/index.html"),
         guide: resolve(import.meta.dirname, "huong-dan/index.html"),

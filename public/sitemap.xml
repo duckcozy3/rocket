@@ -13,6 +13,12 @@
     <priority>0.9000</priority>
   </url>
   <url>
+    <loc>https://locketgold.info/spotify/</loc>
+    <lastmod>2026-10-30</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9000</priority>
+  </url>
+  <url>
     <loc>https://locketgold.info/uy-tin/</loc>
     <lastmod>2026-10-17</lastmod>
     <changefreq>daily</changefreq>

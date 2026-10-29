@@ -61,6 +61,11 @@ h1, h2, h3, p { margin-top: 0; }
 .main-nav a.nav-link--gold .nav-icon { color: #9c6200; }
 .main-nav a.nav-link--gold::after { background: #a66b08; }
 .main-nav a.nav-link--gold em { color: #fff; background: #bf7900; }
+.main-nav a.nav-link--spotify { color: #082b16; background: #1ed760; border-color: #1db954; box-shadow: 0 4px 13px rgba(29,185,84,.16); }
+.main-nav a.nav-link--spotify:hover { color: #052210; background: #3be477; }
+.main-nav a.nav-link--spotify .nav-icon { color: inherit; }
+.main-nav a.nav-link--spotify::after { background: #137a37; }
+.main-nav a.nav-link--spotify:focus-visible { outline-color: #137a37; }
 .main-nav a.is-active::after { opacity: 1; transform: scaleX(1); }
 .main-nav em { margin-left: 2px; padding: 2px 5px; color: #fff; font-size: .6rem; font-style: normal; background: var(--pink-600); border-radius: 6px; }
 .nav-drawer-heading, .nav-backdrop { display: none; }
