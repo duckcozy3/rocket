@@ -1,3 +1,4 @@
+import { spotifySuccess } from "./spotify-success.js";
 import "./styles.css";
 import "./spotify.css";
 import { initSpotify } from "./spotify-checkout.js";
@@ -549,9 +550,9 @@ async function checkOrder(code) {
     }
     status.className = `form-message${state.paid ? " is-success" : ""}`;
     const guide = document.querySelector("#post-payment-guide");
-    const guideType = state.showApkGuide ? "apk" : state.showGoldGuide ? "gold" : state.paid && !order.gold_revoked_at && order.platform === "iOS" ? "gold-pending" : "";
+    const guideType = order.platform === "Spotify" && state.paid ? (state.completed ? "spotify" : "spotify-pending") : state.showApkGuide ? "apk" : state.showGoldGuide ? "gold" : state.paid && !order.gold_revoked_at && order.platform === "iOS" ? "gold-pending" : "";
     if (guideType && guideType !== paymentGuideShown) {
-      guide.innerHTML = guideType === "apk" ? apkInstallationGuide(order) : goldCompletionGuide(order);
+      guide.innerHTML = guideType.startsWith("spotify") ? spotifySuccess(order, escapeHtml) : guideType === "apk" ? apkInstallationGuide(order) : goldCompletionGuide(order);
       document.querySelector("#payment-result").classList.toggle("payment-result--success", guideType !== "apk");
       guide.hidden = false;
       paymentGuideShown = guideType;
