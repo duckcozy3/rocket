@@ -23,6 +23,7 @@ test("sitemap covers the real archive once and prefers published database copies
   assert.equal(response.status, 200);
   assert.match(response.headers.get("Content-Type"), /application\/xml/);
   const xml = await response.text();
+  assert.ok(xml.startsWith('<?xml version="1.0" encoding="UTF-8"?>\n<urlset '));
   const urls = [...xml.matchAll(/<loc>(.*?)<\/loc>/g)].map((match) => match[1]);
   assert.equal(urls.length, PUBLIC_PATHS.length + report.visible_articles + FALLBACK_POSTS.length + 1);
   assert.equal(new Set(urls).size, urls.length);

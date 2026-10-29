@@ -58,7 +58,7 @@ export async function postsResponse(request, env) {
       env.DB ? env.DB.prepare("SELECT slug, title, excerpt, published_at FROM posts WHERE status = 'published' ORDER BY published_at DESC").all() : { results: [] },
     ]);
     if (!Array.isArray(archive)) throw new Error("Invalid post archive");
-    const view = archiveView(mergePostArchive(live.results?.length ? live.results : FALLBACK_POSTS, archive), url.searchParams.get("trang"));
+    const view = archiveView(mergePostArchive([...(live.results || []), ...FALLBACK_POSTS], archive), url.searchParams.get("trang"));
     const canonical = `https://locketgold.info/bai-viet/${view.page > 1 ? `?trang=${view.page}` : ""}`;
     return finishHtml(request, response, new HTMLRewriter()
       .on("title", { element(element) { element.setInnerContent(`Bài viết Locket Gold${view.page > 1 ? ` – Trang ${view.page}` : ""} | Hướng dẫn & mẹo sử dụng`); } })

@@ -187,7 +187,7 @@ async function loadPosts() {
     const [live, archive] = await Promise.allSettled([api("/api/posts"), api("/imported-posts/index.json")]);
     const livePosts = live.status === "fulfilled" && Array.isArray(live.value.posts) && live.value.posts.length ? live.value.posts : fallbackPosts;
     const imported = archive.status === "fulfilled" && Array.isArray(archive.value) ? archive.value : [];
-    const posts = mergePostArchive(livePosts, imported);
+    const posts = mergePostArchive([...livePosts, ...fallbackPosts], imported);
     const view = archiveView(posts, new URLSearchParams(location.search).get("trang"));
     document.title = `Bài viết Locket Gold${view.page > 1 ? ` – Trang ${view.page}` : ""} | Hướng dẫn & mẹo sử dụng`;
     document.querySelector('link[rel="canonical"]')?.setAttribute("href", `https://locketgold.info/bai-viet/${view.page > 1 ? `?trang=${view.page}` : ""}`);
