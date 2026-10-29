@@ -5,10 +5,51 @@ import { readFile, readdir } from "node:fs/promises";
 import worker from "../worker/index.js";
 import { spotifyUid, spotifyPage } from "../src/spotify.js";
 import { createPageRenderer } from "../src/page-render.js";
-import { activateSpotifyOrder } from "../worker/spotify.js";
+import { activateSpotifyOrder, spotifyAvatar } from "../worker/spotify.js";
+
+test("all Spotify plans activate the matching NoDNS package only after payment", async t => {
+  const calls = [], completed = [];
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    assert.equal(url, "https://ctv.nodns.vn/api/v1/spotify");
+    assert.equal(options.method, "POST");
+    assert.equal(options.headers["x-api-key"], "spotify-test-key");
+    assert.equal(options.headers["Content-Type"], "application/json");
+    const body = JSON.parse(options.body);
+    calls.push(body);
+    return Response.json({ status: "success", data: { ...body, active: true } });
+  });
+  const env = { NODNS_API_KEY: "locket-key", SPOTIFY_NODNS_API_KEY: "spotify-test-key", DB: {
+    prepare(sql) { return {
+      async first() { return null; },
+      bind(code) { this.code = code; return this; },
+      async run() { assert.match(sql, /status = 'completed'/); completed.push(this.code); },
+    }; },
+  } };
+  for (const packageId of ["1month", "3month", "6month", "12month"]) {
+    const order = { code: `test-${packageId}`, username: "vanle", platform: "Spotify", plan_id: `spotify-${packageId}` };
+    for (const status of ["pending", "cancelled", "completed"]) await activateSpotifyOrder(env, { ...order, status });
+    await activateSpotifyOrder(env, { ...order, status: "paid" });
+  }
+  assert.deepEqual(calls, ["1month", "3month", "6month", "12month"].map(packageId => ({ uid: "vanle", packageId })));
+  assert.equal(completed.length, 4);
+});
+
+test("Spotify avatar accepts profile image objects and skips empty or invalid fields", async () => {
+  const url = "https://i.scdn.co/image/profile-avatar";
+  assert.equal(spotifyAvatar({ avatar: "", images: [{ url }] }), url);
+  assert.equal(spotifyAvatar({ avatar: { url } }), url);
+  assert.equal(spotifyAvatar({ avatar: "invalid", avatar_url: url }), url);
+  assert.equal(spotifyAvatar({ images: [{ url: "" }, { url }], avatar: "https://example.com/default.png" }), url);
+  assert.equal(spotifyAvatar({ images: [], image_url: url }), url);
+  assert.equal(spotifyAvatar({ avatar: "javascript:alert(1)" }), null);
+  assert.equal(spotifyAvatar({}), null);
+  const headers = await readFile(new URL("../public/_headers", import.meta.url), "utf8");
+  assert.match(headers, /img-src[^;]*https:\/\/i\.scdn\.co/);
+});
 
 test("Spotify accepts only a UID or an actual user profile and renders the requested controls", () => {
   assert.equal(spotifyUid(" https://open.spotify.com/user/alice?si=123 "), "alice");
+  assert.equal(spotifyUid("https://open.spotify.com/user/31ve532dzsr3vle7da5g7j2vrg7a?si=zey17jhSRWqbQkw5n_rt3Q"), "31ve532dzsr3vle7da5g7j2vrg7a");
   assert.equal(spotifyUid("spotify:user:alice"), "alice");
   for (const input of ["https://open.spotify.com/playlist/abc", "https://evil.example/user/alice", "https://open.spotify.com@evil.example/user/alice", "alice@example.com", "../alice", "", null]) assert.equal(spotifyUid(input), null);
   const html = spotifyPage();
@@ -33,27 +74,27 @@ test("Spotify lookup, separate admin coupons and paid activation work with the r
   let grants = 0, providerMode = "found";
   t.mock.method(globalThis, "fetch", async (url, options) => {
     const upstream = new URL(url);
+    if (upstream.origin === "https://open.spotify.com") {
+      if (providerMode === "missing") return new Response("missing", { status: 404 });
+      return new Response(`<link rel="canonical" href="https://open.spotify.com/user/${providerMode === "mismatch" ? "someone-else" : "alice"}"><meta property="og:title" content="Alice | Spotify"><meta property="og:image" content="https://i.scdn.co/image/test">`, { headers: { "Content-Type": "text/html" } });
+    }
     assert.equal(upstream.origin, "https://ctv.nodns.vn");
     assert.equal(options.headers["x-api-key"], "private-test-key");
-    if (upstream.pathname === "/api/v1/spotify/lookup") {
-      if (providerMode === "missing") return Response.json({ status: "error", message: "Không tìm thấy tài khoản." }, { status: 404 });
-      return Response.json({ status: "success", data: { uid: providerMode === "mismatch" ? "someone-else" : upstream.searchParams.get("uid"), display_name: "Alice", avatar: "https://i.scdn.co/image/test" } });
-    }
     assert.equal(upstream.pathname, "/api/v1/spotify"); grants++;
     const body = JSON.parse(options.body);
     assert.equal(body.packageId, "1month");
     return Response.json({ status: "success", data: { uid: body.uid, active: true, packageId: body.packageId } });
   });
-  const env = { DB, SITE_URL: "https://locketgold.info", NODNS_API_KEY: "private-test-key", SESSION_SECRET: "spotify-test-session-secret-at-least-32-bytes", ADMIN_PASSWORD_SHA256: "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918", SEPAY_WEBHOOK_API_KEY: "test-sepay", BANK_ACCOUNT: "5565662518", BANK_BIN: "970422" };
+  const env = { DB, SITE_URL: "https://locketgold.info", NODNS_API_KEY: "locket-only-key", SPOTIFY_NODNS_API_KEY: "private-test-key", SESSION_SECRET: "spotify-test-session-secret-at-least-32-bytes", ADMIN_PASSWORD_SHA256: "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918", SEPAY_WEBHOOK_API_KEY: "test-sepay", BANK_ACCOUNT: "5565662518", BANK_BIN: "970422" };
   const jobs = [], ctx = { waitUntil(job) { jobs.push(job); } };
   const call = (path, method = "GET", body, cookie = "", extra = {}) => worker.fetch(new Request(env.SITE_URL + path, { method, headers: { Origin: env.SITE_URL, "Content-Type": "application/json", Cookie: cookie, ...extra }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }), env, ctx);
   const profile = await call("/api/spotify/lookup?uid=alice");
   assert.equal(profile.status, 200);
-  assert.deepEqual(await profile.json(), { uid: "alice", display_name: "Alice", avatar: "https://i.scdn.co/image/test" });
+  const found = await profile.json(); assert.equal(found.display_name, "Alice"); assert.equal(found.avatar, "https://i.scdn.co/image/test"); assert.equal(found.lookup_status, "found");
   providerMode = "missing";
-  assert.equal((await call("/api/spotify/lookup?uid=unknown")).status, 404);
+  assert.equal((await (await call("/api/spotify/lookup?uid=unknown")).json()).lookup_status, "unavailable");
   providerMode = "mismatch";
-  assert.equal((await call("/api/spotify/lookup?uid=alice")).status, 502);
+  assert.equal((await (await call("/api/spotify/lookup?uid=alice")).json()).lookup_status, "unavailable");
   providerMode = "found";
   assert.equal((await call("/api/admin/spotify/promos")).status, 401);
   const login = await call("/api/admin/login", "POST", { username: "admin", password: "admin" });

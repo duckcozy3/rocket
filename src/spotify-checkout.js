@@ -1,14 +1,13 @@
 import { SPOTIFY_PLANS, spotifyUid } from "./spotify.js";
-import { paymentQrUrl } from "./payment.js";
 
-export function initSpotify(api, { escapeHtml: esc, money }) {
+export function initSpotify(api, { escapeHtml: esc, money, showPayment: renderPayment }) {
   const form = document.querySelector("#spotify-form");
   if (!form) return;
   const input = form.elements.uid, coupon = form.elements.promo_code, pay = document.querySelector("#spotify-pay");
   const profileBox = document.querySelector("#spotify-profile"), lookupStatus = document.querySelector("#spotify-lookup-status");
   const quoteStatus = document.querySelector("#spotify-quote-status"), submitStatus = document.querySelector("#spotify-submit-status");
   let verified = null, lookupTimer, abort, lookupVersion = 0, quoteVersion = 0, creating = false;
-  let quote = null, paymentTimer, profileUrl = "";
+  let quote = null, profileUrl = "http://103.101.161.228:8082/spotify-mitm.mobileconfig";
   const plan = () => SPOTIFY_PLANS.find(p => p.id === document.querySelector('input[name="spotify-plan"]:checked')?.value) || SPOTIFY_PLANS[0];
   const couponCode = () => coupon.value.trim().toUpperCase();
   const validQuote = () => quote && quote.plan.id === plan().id && (quote.promo_code || "") === couponCode();
@@ -32,13 +31,22 @@ export function initSpotify(api, { escapeHtml: esc, money }) {
       try {
         const data = await api(`/api/spotify/lookup?uid=${encodeURIComponent(uid)}`, { signal: controller.signal });
         if (version !== lookupVersion || controller.signal.aborted) return;
-        if (data.uid !== uid || !data.display_name) throw Error("Kết quả tài khoản không khớp. Vui lòng kiểm tra lại.");
+        if (data.uid !== uid) throw Error("Kết quả tài khoản không khớp. Vui lòng kiểm tra lại.");
+        if (data.lookup_status !== "found") {
+          const detail = document.createElement("div"), name = document.createElement("strong"), username = document.createElement("small"), link = document.createElement("a");
+          name.textContent = "Chưa lấy được tên và avatar";
+          username.textContent = `UID: ${uid}`;
+          link.href = `https://open.spotify.com/user/${encodeURIComponent(uid)}`; link.target = "_blank"; link.rel = "noopener noreferrer"; link.textContent = "Xem hồ sơ Spotify";
+          detail.append(name, username, link); profileBox.replaceChildren(detail); profileBox.hidden = false;
+          lookupStatus.textContent = "Spotify chưa cung cấp metadata hồ sơ. Vui lòng thử lại trước khi thanh toán.";
+          return;
+        }
         verified = data;
         const avatar = document.createElement("img");
         avatar.src = data.avatar || "/images/logo.png"; avatar.alt = ""; avatar.width = 52; avatar.height = 52; avatar.referrerPolicy = "no-referrer";
         avatar.addEventListener("error", () => { avatar.src = "/images/logo.png"; }, { once: true });
         const detail = document.createElement("div"), name = document.createElement("strong"), username = document.createElement("small");
-        name.textContent = data.display_name; username.textContent = uid; detail.append(name, username);
+        name.textContent = data.display_name; username.textContent = `UID: ${uid}`; detail.append(name, username);
         profileBox.replaceChildren(avatar, detail); profileBox.hidden = false;
         lookupStatus.textContent = "Đã tìm thấy tài khoản. Kiểm tra tên và avatar trước khi thanh toán.";
       } catch (error) { if (version === lookupVersion && !controller.signal.aborted) lookupStatus.textContent = error.message; }
@@ -76,27 +84,19 @@ export function initSpotify(api, { escapeHtml: esc, money }) {
     document.querySelector("#spotify-orders").innerHTML = saved.length ? saved.map(o => `<button type="button" class="spotify-saved-order" data-code="${esc(o.code)}"><strong>${esc(o.uid || "Spotify")}</strong><span>${esc(o.plan || "Spotify Premium")}</span><small>${esc(o.code)} · Xem đơn →</small></button>`).join("") : '<p class="spotify-empty">Bạn chưa có đơn Spotify nào.</p>';
   }
   function persist() { try { localStorage.setItem("locketgold:spotify-orders", JSON.stringify(saved)); } catch { /* Checkout still works without storage. */ } }
-  let currentCode = "";
   async function showPayment(code) {
-    clearTimeout(paymentTimer); currentCode = code;
-    const panel = document.querySelector("#spotify-payment"); panel.hidden = false;
-    try {
-      const order = await api(`/api/orders/${encodeURIComponent(code)}`);
-      if (currentCode !== code) return;
-      if (order.platform !== "Spotify") throw Error("Đây không phải đơn Spotify.");
-      const qr = order.status === "pending" ? paymentQrUrl({ ...order, amount: Number(order.amount) }) : "";
-      const states = { pending: "Chờ thanh toán", paid: "Đã thanh toán, đang xử lý kích hoạt", completed: "Đã kích hoạt Spotify thành công", cancelled: "Đơn đã hết hạn hoặc đã hủy", failed: "Đơn cần hỗ trợ xử lý" };
-      panel.innerHTML = `<div class="spotify-payment-box"><h3>${esc(states[order.status] || "Đang kiểm tra đơn")}</h3><p>${esc(order.username)} · ${esc(order.plan_name)}</p><p>Mã đơn: <b>${esc(order.code)}</b></p>${order.status === "pending" ? `${qr ? `<img class="spotify-qr" src="${esc(qr)}" alt="Mã thanh toán đơn Spotify ${esc(order.code)}" width="240" height="240">` : ""}<dl><div><dt>Ngân hàng</dt><dd>${esc(order.bank_name)}</dd></div><div><dt>Số tài khoản</dt><dd>${esc(order.bank_account)}</dd></div><div><dt>Chủ tài khoản</dt><dd>${esc(order.account_name)}</dd></div><div><dt>Số tiền</dt><dd>${money(order.amount)}</dd></div><div><dt>Nội dung chuyển khoản</dt><dd><b>${esc(order.transfer_content)}</b></dd></div></dl><p>Hạn thanh toán: ${esc(new Date(order.expires_at).toLocaleString("vi-VN"))}. Chuyển đúng nội dung và số tiền.</p>` : ""}<p role="status">${order.status === "paid" ? "Bạn không cần thanh toán lại. Trạng thái sẽ tự cập nhật." : ""}</p><a href="/lien-he/">Liên hệ hỗ trợ</a></div>`;
-      if (["pending", "paid"].includes(order.status)) paymentTimer = setTimeout(() => { if (!document.hidden) showPayment(code); }, 5000);
-    } catch (error) {
-      if (currentCode !== code) return;
-      panel.textContent = `Chưa kiểm tra được đơn ${code}: ${error.message}. Giữ lại mã đơn và liên hệ hỗ trợ nếu cần.`;
-      paymentTimer = setTimeout(() => { if (!document.hidden) showPayment(code); }, 10000);
-    }
+    const order = await api(`/api/orders/${encodeURIComponent(code)}`);
+    if (order.platform !== "Spotify") throw Error("Invalid Spotify order");
+    renderPayment(order);
+    document.querySelector("#payment-result").scrollIntoView({ behavior: "smooth", block: "start" });
   }
-  document.querySelector("#spotify-orders").addEventListener("click", e => { const item = e.target.closest("[data-code]"); if (item) showPayment(item.dataset.code); });
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && currentCode) showPayment(currentCode); else clearTimeout(paymentTimer); });
-  window.addEventListener("pagehide", () => { clearTimeout(paymentTimer); clearTimeout(lookupTimer); abort?.abort(); });
+  document.querySelector("#spotify-orders").addEventListener("click", async e => {
+    const item = e.target.closest("[data-code]");
+    if (!item) return;
+    try { await showPayment(item.dataset.code); }
+    catch (error) { submitStatus.textContent = error.message; }
+  });
+  window.addEventListener("pagehide", () => { clearTimeout(lookupTimer); abort?.abort(); });
   form.addEventListener("submit", async e => {
     e.preventDefault(); if (pay.disabled || creating) return;
     const uid = verified?.uid, selected = plan();
@@ -106,7 +106,7 @@ export function initSpotify(api, { escapeHtml: esc, money }) {
       const order = await api("/api/spotify/orders", { method: "POST", body: JSON.stringify({ uid, plan_id: selected.id, promo_code: couponCode() }) });
       saved = [{ code: order.code, uid, plan: selected.name }, ...saved.filter(o => o.code !== order.code)].slice(0, 10); persist(); renderOrders();
       submitStatus.textContent = `Đã tạo đơn ${order.code}.`; await showPayment(order.code);
-      document.querySelector("#spotify-payment").scrollIntoView({ behavior: "smooth", block: "start" });
+      document.querySelector("#payment-result").scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (error) { submitStatus.textContent = error.message; }
     finally { creating = false; summary(); }
   });

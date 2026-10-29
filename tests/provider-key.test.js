@@ -66,3 +66,27 @@ test("default secret remains usable without override; encrypted key fails closed
   const db = { prepare() { return { async first() { return { encrypted_key: cipher }; } }; } };
   await assert.rejects(resolveNoDnsEnv({ ...env, DB: db, SESSION_SECRET: "different-secret" }), { status: 503 });
 });
+
+test("Spotify admin key is stored separately and never falls back to Locket", async t => {
+  const cookie = await login();
+  const rows = new Map();
+  const DB = { prepare(sql) {
+    const provider = sql.includes("'nodns-spotify'") ? "spotify" : "locket";
+    return { bind(...values) { this.values = values; return this; }, async first() { return rows.get(provider); }, async run() { rows.set(provider, { encrypted_key: this.values[0] }); } };
+  } };
+  const config = { ...env, DB };
+  rows.set("locket", { encrypted_key: await encryptNoDnsKey(env, "locket-stored") });
+  assert.equal((await resolveNoDnsEnv(config, "spotify")).NODNS_API_KEY, "");
+  assert.equal((await resolveNoDnsEnv(config)).NODNS_API_KEY, "locket-stored");
+  const endpoint = `${site}/api/admin/spotify/provider/key`;
+  assert.equal((await worker.fetch(new Request(endpoint), config, {})).status, 401);
+  t.mock.method(globalThis, "fetch", async (_url, options) => {
+    assert.equal(options.headers["x-api-key"], "spotify-private");
+    return Response.json({ status: "success", data: { username: "spotify-owner", active: true } });
+  });
+  const result = await worker.fetch(new Request(endpoint, { method: "POST", headers: { Cookie: cookie, Origin: site, "Content-Type": "application/json" }, body: JSON.stringify({ api_key: "spotify-private" }) }), config, {});
+  assert.equal(result.status, 200);
+  assert.equal((await resolveNoDnsEnv(config, "spotify")).NODNS_API_KEY, "spotify-private");
+  assert.equal((await resolveNoDnsEnv(config)).NODNS_API_KEY, "locket-stored");
+  assert.equal((await resolveNoDnsEnv({ ...config, NODNS_CREDENTIALS_ENABLED: "false" }, "spotify")).NODNS_API_KEY, "spotify-private");
+});

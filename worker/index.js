@@ -50,6 +50,7 @@ export default {
 
 async function route(request, env, ctx, url) {
   const { pathname } = url;
+  if (pathname === "/api/admin/spotify/provider/key") return adminProviderKey(request, env, "spotify");
   if (pathname.startsWith("/api/spotify/") || pathname.startsWith("/api/admin/spotify/")) {
     if (pathname.startsWith("/api/admin/")) await requireSession(request, env, "admin");
     rateLimit(request, "spotify", 60, 60_000);
@@ -513,11 +514,13 @@ function missingAdminDeletedColumn(error) {
   return /no such column:\s*(?:orders\.)?admin_deleted_at\b/i.test(String(error?.message || ""));
 }
 
-async function adminProviderKey(request, env) {
+async function adminProviderKey(request, env, service = "locket") {
+  const spotify = service === "spotify";
+  const provider = spotify ? "nodns-spotify" : "nodns";
   const admin = await requireSession(request, env, "admin"); requireDb(env);
   if (request.method === "GET") {
-    const row = await env.DB.prepare("SELECT updated_at, updated_by FROM provider_credentials WHERE provider = 'nodns'").first();
-    return json({ configured: Boolean(row || env.NODNS_API_KEY), source: row ? "admin" : "cloudflare", updated_at: row?.updated_at || null });
+    const row = await env.DB.prepare(`SELECT updated_at, updated_by FROM provider_credentials WHERE provider = '${provider}'`).first();
+    return json({ configured: Boolean(row || (spotify ? env.SPOTIFY_NODNS_API_KEY : env.NODNS_API_KEY)), source: row ? "admin" : "cloudflare", updated_at: row?.updated_at || null });
   }
   if (request.method !== "POST") throw httpError(405, "Phương thức không được hỗ trợ.");
   const body = await readJson(request);
@@ -527,8 +530,8 @@ async function adminProviderKey(request, env) {
   const { result } = await providerRequest({ ...env, NODNS_API_KEY: key }, "/api/v1/me", { apiKey: true });
   const account = unwrap(result);
   if (result.status !== "success" || !account.username || account.active === false) throw httpError(400, "NoDNS chưa xác nhận khóa của tài khoản đang hoạt động.");
-  const encrypted = await encryptNoDnsKey(env, key);
-  await env.DB.prepare("INSERT INTO provider_credentials (provider, encrypted_key, updated_by) VALUES ('nodns', ?, ?) ON CONFLICT(provider) DO UPDATE SET encrypted_key = excluded.encrypted_key, updated_by = excluded.updated_by, updated_at = CURRENT_TIMESTAMP")
+  const encrypted = await encryptNoDnsKey(env, key, service);
+  await env.DB.prepare(`INSERT INTO provider_credentials (provider, encrypted_key, updated_by) VALUES ('${provider}', ?, ?) ON CONFLICT(provider) DO UPDATE SET encrypted_key = excluded.encrypted_key, updated_by = excluded.updated_by, updated_at = CURRENT_TIMESTAMP`)
     .bind(encrypted, String(admin.sub || "admin")).run();
   return json({ message: "Đã kiểm tra và lưu khóa API NoDNS mới.", account: { username: cleanText(account.username, 100), remaining: Number(account.remaining || 0) } });
 }

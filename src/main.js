@@ -538,11 +538,15 @@ async function checkOrder(code) {
       result.classList.add("payment-result--expired");
       if (!result.querySelector("[data-reorder]")) {
         const link = document.createElement("a");
-        link.href = "/thanh-toan/"; link.className = "button button--outline"; link.dataset.reorder = ""; link.textContent = "Tạo đơn mới";
+        link.href = order.platform === "Spotify" ? "/spotify/" : "/thanh-toan/"; link.className = "button button--outline"; link.dataset.reorder = ""; link.textContent = "Tạo đơn mới";
         status.after(link);
       }
     }
     status.textContent = state.message;
+    if (order.platform === "Spotify") {
+      if (order.status === "paid") status.textContent = "✓ SePay đã xác nhận thanh toán. Đang kích hoạt Spotify Premium. Bạn không cần thanh toán lại.";
+      if (order.status === "completed") status.textContent = "✓ Đã kích hoạt Spotify Premium thành công. Mở lại Spotify bằng tài khoản đã thanh toán.";
+    }
     status.className = `form-message${state.paid ? " is-success" : ""}`;
     const guide = document.querySelector("#post-payment-guide");
     const guideType = state.showApkGuide ? "apk" : state.showGoldGuide ? "gold" : state.paid && !order.gold_revoked_at && order.platform === "iOS" ? "gold-pending" : "";
@@ -649,6 +653,7 @@ async function renderAdmin() {
   provider.innerHTML = `<h2>Kết nối NoDNS</h2><p>API cấp Gold: <strong>${integration.nodns_key ? "Đã cấu hình khóa" : "Chưa cấu hình khóa API"}</strong> · Cơ sở dữ liệu: <strong>${integration.database ? "Đã kết nối" : "Chưa kết nối"}</strong></p><p>CTV: ${integration.remote_ctv ? "Tài khoản và lượt trên NoDNS" : "Tài khoản và số dư trong cơ sở dữ liệu"}. Đơn khách lẻ, giá, bài viết và mã giảm giá được quản lý trong cơ sở dữ liệu của trang web.</p><button id="provider-refresh" class="button button--outline" type="button">Kiểm tra API và lịch sử cấp Gold</button><div id="provider-result" aria-live="polite"></div>`;
   dash.querySelector("#overview").after(provider);
   addProviderKeyForm(provider, api);
+  addProviderKeyForm(provider, api, "spotify");
   addManualUpgradeForm(provider, api);
   addAdminNoDns(dash, api, integration.remote_admin);
   addAdminSepay(dash, api, { escapeHtml, money });
@@ -901,7 +906,7 @@ loadPosts();
 loadDownloads();
 initWelcomeModal();
 initCheckout();
-initSpotify(api, { escapeHtml, money });
+initSpotify(api, { escapeHtml, money, showPayment });
 initCtv();
 initAdmin();
 initActivitySound();

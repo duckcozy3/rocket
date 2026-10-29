@@ -1,20 +1,23 @@
 const DEFAULT_BASE = "https://ctv.nodns.vn";
 const encoder = new TextEncoder();
 
-export async function resolveNoDnsEnv(env) {
-  if (env.NODNS_CREDENTIALS_ENABLED !== "true" || !env.DB) return env;
-  const row = await env.DB.prepare("SELECT encrypted_key FROM provider_credentials WHERE provider = 'nodns'").first();
+export async function resolveNoDnsEnv(env, service = "locket") {
+  const spotify = service === "spotify";
+  if (spotify) env = { ...env, NODNS_API_KEY: env.SPOTIFY_NODNS_API_KEY || "", UPSTREAM_API_KEY: "" };
+  if ((!spotify && env.NODNS_CREDENTIALS_ENABLED !== "true") || !env.DB) return env;
+  const row = await env.DB.prepare(`SELECT encrypted_key FROM provider_credentials WHERE provider = '${spotify ? "nodns-spotify" : "nodns"}'`).first();
   if (!row) return env;
   try {
     const [iv, ciphertext] = row.encrypted_key.split(".");
-    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: decode(iv), additionalData: encoder.encode("nodns-api-key") }, await cookieKey(env), decode(ciphertext));
+    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: decode(iv), additionalData: encoder.encode(spotify ? "nodns-spotify-api-key" : "nodns-api-key") }, await cookieKey(env), decode(ciphertext));
     return { ...env, NODNS_API_KEY: new TextDecoder().decode(plain), NODNS_KEY_SOURCE: "admin" };
   } catch { throw failure(503, "Không đọc được khóa NoDNS đã lưu. Kiểm tra SESSION_SECRET hoặc lưu lại khóa trong admin."); }
 }
 
-export async function encryptNoDnsKey(env, value) {
+export async function encryptNoDnsKey(env, value, service = "locket") {
+  const spotify = service === "spotify";
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: encoder.encode("nodns-api-key") }, await cookieKey(env), encoder.encode(value));
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: encoder.encode(spotify ? "nodns-spotify-api-key" : "nodns-api-key") }, await cookieKey(env), encoder.encode(value));
   return `${encode(iv)}.${encode(new Uint8Array(ciphertext))}`;
 }
 

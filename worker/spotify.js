@@ -1,3 +1,4 @@
+import { lookupPublicSpotify } from "./spotify-profile.js";
 import { SPOTIFY_PLANS, spotifyUid } from "../src/spotify.js";
 import { providerRequest, resolveNoDnsEnv, unwrap } from "./nodns.js";
 
@@ -5,19 +6,21 @@ const fail = (status, message) => Object.assign(new Error(message), { status, pu
 const json = (body, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 const dbRequired = env => { if (!env.DB) throw fail(503, "Chưa cấu hình cơ sở dữ liệu Spotify."); };
 
+export function spotifyAvatar(user) {
+  const candidates = [user.images, user.avatar_url, user.avatarUrl, user.avatar, user.photoURL, user.photo_url, user.image_url, user.image];
+  for (const candidate of candidates.flatMap(value => Array.isArray(value) ? value : [value])) {
+    const raw = typeof candidate === "string" ? candidate : candidate?.url ?? candidate?.src;
+    if (typeof raw !== "string" || !raw.trim()) continue;
+    try {
+      const url = new URL(raw);
+      if (url.protocol === "https:" && !url.username && !url.password) return url.href;
+    } catch { /* Try the next profile image. */ }
+  }
+  return null;
+}
+
 export async function lookupSpotify(env, uid) {
-  env = await resolveNoDnsEnv(env);
-  const { result } = await providerRequest(env, `/api/v1/spotify/lookup?uid=${encodeURIComponent(uid)}`, { apiKey: true });
-  const data = unwrap(result);
-  const user = data.user && typeof data.user === "object" ? data.user : data;
-  const actual = user.uid ?? user.id ?? user.username;
-  if (actual && String(actual) !== uid) throw fail(502, "Tài khoản trả về không khớp UID. Vui lòng kiểm tra lại.");
-  const name = user.display_name ?? user.displayName ?? user.name;
-  const rawAvatar = user.avatar ?? user.avatar_url ?? user.photoURL ?? user.image ?? user.images?.[0]?.url;
-  let avatar = null;
-  try { const image = new URL(rawAvatar); if (image.protocol === "https:" && !image.username && !image.password) avatar = image.href; } catch { /* Use a local placeholder if the user has no image. */ }
-  if (typeof name !== "string" || !name.trim()) throw fail(502, "Chưa lấy được tên tài khoản Spotify. Vui lòng thử lại.");
-  return { uid, display_name: name.trim().slice(0, 200), avatar };
+  return lookupPublicSpotify(uid);
 }
 
 export async function spotifyQuote(env, body) {
@@ -45,7 +48,7 @@ export async function spotifyApi(request, env, ctx, { readJson, transferDetails,
   };
   if (path === "/api/spotify/plans" && request.method === "GET") return json({ plans: SPOTIFY_PLANS, profile_url: env.SPOTIFY_PROFILE_URL || "http://103.101.161.228:8082/spotify-mitm.mobileconfig" });
   if (path === "/api/spotify/lookup" && request.method === "GET") {
-    const uid = spotifyUid(url.searchParams.get("input") ?? url.searchParams.get("uid") ?? "");
+    const uid = spotifyUid(url.searchParams.get("input") ?? url.searchParams.get("url") ?? url.searchParams.get("uid") ?? "");
     if (!uid) throw fail(400, "Nhập Spotify Username hoặc link hồ sơ hợp lệ.");
     return json(await lookupSpotify(env, uid));
   }
@@ -55,8 +58,9 @@ export async function spotifyApi(request, env, ctx, { readJson, transferDetails,
     const body = await readBody(), uid = spotifyUid(body.uid);
     if (!uid) throw fail(400, "Tài khoản Spotify không hợp lệ.");
     const quote = await spotifyQuote(env, body);
-    // Verify on the server as well; a client-side name/avatar cannot authorize an order.
-    await lookupSpotify(env, uid);
+    // Read public metadata on the server as well; do not trust client-supplied profile data.
+    const profile = await lookupSpotify(env, uid);
+    if (profile.lookup_status !== "found") throw fail(502, "Chưa lấy được tên và avatar từ hồ sơ Spotify. Vui lòng thử lại.");
     const code = `LG${randomCode(8)}`, expires_at = new Date(Date.now() + 10 * 60000).toISOString();
     const status = quote.total === 0 ? "paid" : "pending";
     await env.DB.prepare("INSERT INTO orders (code, username, contact, plan_id, plan_name, platform, subtotal, discount_amount, amount, promo_code, expires_at, status, paid_at) VALUES (?, ?, ?, ?, ?, 'Spotify', ?, ?, ?, ?, ?, ?, ?)")
@@ -95,7 +99,7 @@ export async function activateSpotifyOrder(env, order) {
   const plan = SPOTIFY_PLANS.find(item => item.id === order.plan_id);
   if (!plan) return;
   try {
-    env = await resolveNoDnsEnv(env);
+    env = await resolveNoDnsEnv(env, "spotify");
     const { result } = await providerRequest(env, "/api/v1/spotify", { method: "POST", apiKey: true, body: { uid: order.username, packageId: plan.packageId } });
     const data = unwrap(result);
     if (!(result.success === true || result.status === "success") || data.active === false || (data.uid && data.uid !== order.username) || (data.packageId && data.packageId !== plan.packageId)) return;
