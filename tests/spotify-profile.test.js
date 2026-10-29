@@ -18,3 +18,25 @@ test("unavailable metadata still returns the UID without inventing a name or ava
   assert.equal(result.display_name, null);
   assert.equal(result.avatar, null);
 });
+
+test("lookup uses Worker-compatible manual redirects and follows only the same profile", async t => {
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    assert.equal(options.redirect, "manual");
+    calls++;
+    if (calls === 1) return new Response(null, { status: 302, headers: { location: "/intl-en/user/alice" } });
+    return new Response('<meta property="og:title" content="Alice"><meta property="og:image" content="https://i.scdn.co/image/avatar">', { headers: { "content-type": "text/html" } });
+  });
+  assert.equal((await lookupPublicSpotify("alice")).display_name, "Alice");
+  assert.equal(calls, 2);
+});
+
+test("lookup rejects redirects to another host or user", async t => {
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    calls++;
+    return new Response(null, { status: 302, headers: { location: "https://example.com/user/alice" } });
+  });
+  assert.equal((await lookupPublicSpotify("alice")).lookup_status, "unavailable");
+  assert.equal(calls, 1);
+});

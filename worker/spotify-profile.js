@@ -20,7 +20,18 @@ export async function lookupPublicSpotify(uid) {
   const profile_url = `https://open.spotify.com/user/${encodeURIComponent(uid)}`;
   const fallback = { success: true, uid, display_name: null, avatar: null, profile_url, lookup_status: "unavailable", source: "public_metadata" };
   try {
-    const response = await fetch(profile_url, { headers: { Accept: "text/html", "Accept-Language": "en-US,en;q=0.9" }, redirect: "error", signal: AbortSignal.timeout(8000) });
+    const signal = AbortSignal.timeout(8000);
+    let target = profile_url, response;
+    for (let redirects = 0; redirects <= 3; redirects++) {
+      response = await fetch(target, { headers: { Accept: "text/html", "Accept-Language": "en-US,en;q=0.9" }, redirect: "manual", signal });
+      if (![301, 302, 303, 307, 308].includes(response.status)) break;
+      const location = response.headers.get("location");
+      await response.body?.cancel();
+      if (!location || redirects === 3) return fallback;
+      const next = new URL(location, target);
+      if (spotifyUid(next.href) !== uid) return fallback;
+      target = next.href;
+    }
     if (!response.ok || !response.headers.get("content-type")?.includes("text/html")) return fallback;
     const reader = response.body.getReader();
     const chunks = []; let size = 0;
