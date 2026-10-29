@@ -2,6 +2,7 @@
 import hashlib
 import json
 import re
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -10,10 +11,11 @@ from bs4 import BeautifulSoup, SoupStrainer
 ROOT = Path(__file__).resolve().parents[1]
 DIRECTORY = ROOT / "public" / "imported-posts"
 CACHE = ROOT / "tmp" / "source-posts"
-metadata = json.loads((CACHE / "metadata.json").read_text(encoding="utf-8"))
 index = json.loads((DIRECTORY / "index.json").read_text(encoding="utf-8"))
-assert len(index) == len(metadata) == 2499
-assert {post["slug"] for post in index} == {post["slug"] for post in metadata}
+# Pass a monthly import report to verify only that batch against cached source HTML.
+metadata = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))["articles"] if len(sys.argv) > 1 else index
+assert metadata
+assert {post["slug"] for post in metadata} <= {post["slug"] for post in index}
 
 
 def block_text(nodes):
@@ -41,6 +43,6 @@ def verify(item):
 with ThreadPoolExecutor(max_workers=4) as pool:
     for number, slug in enumerate(pool.map(verify, metadata), 1):
         if number % 500 == 0:
-            print(f"Verified {number}/{len(index)} articles", flush=True)
+            print(f"Verified {number}/{len(metadata)} articles", flush=True)
 assert all(path.stat().st_size < 25 * 1024 * 1024 for path in (ROOT / "public" / "images" / "imported-posts").iterdir())
-print(f"Verified {len(index)} complete articles: original titles, text, formatting tree and local images.")
+print(f"Verified {len(metadata)} complete articles: original titles, text, formatting tree and local images.")

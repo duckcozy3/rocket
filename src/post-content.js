@@ -1,4 +1,4 @@
-import { postText } from "./post-brand.js";
+import { postText, postHref } from "./post-brand.js";
 const escape = (value) => postText(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 const importedTags = new Set(["p", "h2", "h3", "h4", "h5", "h6", "strong", "b", "em", "i", "u", "s", "ul", "ol", "li", "blockquote", "br", "hr", "a", "img", "figure", "figcaption", "table", "thead", "tbody", "tr", "th", "td", "pre", "code", "div", "span"]);
@@ -12,7 +12,7 @@ function renderImportedNode(node) {
   const attrs = node.attrs || {};
   if (node.tag === "img") return safeImage(attrs.src) ? `<img src="${escape(attrs.src)}" alt="${escape(attrs.alt)}" loading="lazy" decoding="async">` : "";
   let attributes = "";
-  if (node.tag === "a" && safeHref(attrs.href)) attributes += ` href="${escape(attrs.href)}" rel="noopener noreferrer"`;
+  if (node.tag === "a" && safeHref(attrs.href)) attributes += ` href="${escape(postHref(attrs.href))}" rel="noopener noreferrer"`;
   for (const key of ["colspan", "rowspan", "start"]) if (/^\d{1,3}$/.test(String(attrs[key] || ""))) attributes += ` ${key}="${attrs[key]}"`;
   return ["br", "hr"].includes(node.tag) ? `<${node.tag}>` : `<${node.tag}${attributes}>${children}</${node.tag}>`;
 }
