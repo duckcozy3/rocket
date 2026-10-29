@@ -38,7 +38,7 @@
     {
       "binding": "DB",
       "database_name": "locketgold-db",
-      "database_id": "fc247c70-d967-4a1b-a492-2e2620c8475f",
+      "database_id": "9586b6f0-bd60-4766-8551-b3225f4d195e",
       "migrations_dir": "migrations"
     }
   ]
