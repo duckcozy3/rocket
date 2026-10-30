@@ -97,17 +97,6 @@ export function initSpotify(api, { escapeHtml: esc, money, showPayment: renderPa
     try { if (!profileUrl) throw Error(); await navigator.clipboard.writeText(profileUrl); status.textContent = "Đã chép link profile."; }
     catch { status.textContent = "Chưa chép được link. Bạn có thể nhấn giữ nút Tải profile để sao chép."; }
   });
-  const getSaved = () => { try { const values = JSON.parse(localStorage.getItem("locketgold:spotify-orders") || "[]"); return Array.isArray(values) ? values.filter(o => /^LG[A-Z0-9]{8}$/.test(o.code)).slice(0, 10) : []; } catch { return []; } };
-  let saved = getSaved();
-  function renderOrders() {
-    document.querySelector("#spotify-orders").innerHTML = saved.length ? saved.map(o => `<button type="button" class="spotify-saved-order" data-code="${esc(o.code)}"><strong>${esc(o.uid || "Spotify")}</strong><span>${esc(o.plan || "Spotify Premium")}</span><small>${esc(o.code)} · Xem đơn →</small></button>`).join("") : '<p class="spotify-empty">Bạn chưa có đơn Spotify nào.</p>';
-  }
-  function persist() { try { localStorage.setItem("locketgold:spotify-orders", JSON.stringify(saved)); } catch { /* Checkout still works without storage. */ } }
-  document.querySelector("#spotify-orders").addEventListener("click", async e => {
-    const item = e.target.closest("[data-code]");
-    if (!item) return;
-    window.open(`/spotify/?order=${encodeURIComponent(item.dataset.code)}`, "_blank", "noopener");
-  });
   window.addEventListener("pagehide", () => { clearTimeout(lookupTimer); abort?.abort(); });
   form.addEventListener("submit", async e => {
     e.preventDefault(); if (pay.disabled || creating) return;
@@ -118,7 +107,6 @@ export function initSpotify(api, { escapeHtml: esc, money, showPayment: renderPa
     creating = true; summary(); submitStatus.textContent = "Đang tạo đơn thanh toán…";
     try {
       const order = await api("/api/spotify/orders", { method: "POST", body: JSON.stringify({ uid, plan_id: selected.id, promo_code: couponCode() }) });
-      saved = [{ code: order.code, uid, plan: selected.name }, ...saved.filter(o => o.code !== order.code)].slice(0, 10); persist(); renderOrders();
       const paymentUrl = `/spotify/?order=${encodeURIComponent(order.code)}`;
       submitStatus.textContent = `Đã tạo đơn ${order.code}.`;
       const link = document.createElement("a"); link.href = paymentUrl; link.target = "_blank"; link.rel = "noopener"; link.textContent = " Mở trang thanh toán"; submitStatus.append(link);
@@ -127,5 +115,5 @@ export function initSpotify(api, { escapeHtml: esc, money, showPayment: renderPa
     } catch (error) { paymentTab?.close(); submitStatus.textContent = error.message; }
     finally { creating = false; summary(); }
   });
-  renderOrders(); summary();
+  summary();
 }

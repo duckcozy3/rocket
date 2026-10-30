@@ -1,3 +1,4 @@
+import { initHomeReveal } from "./home-reveal.js";
 import { spotifySuccess } from "./spotify-success.js";
 import "./styles.css";
 import "./spotify.css";
@@ -902,7 +903,8 @@ function relativeTime(value) {
 initNavigation();
 initFeedbackGallery();
 initGuide();
-loadPlans();
+const refreshHomeReveal = initHomeReveal();
+loadPlans().then(refreshHomeReveal);
 loadPosts();
 loadDownloads();
 initWelcomeModal();
