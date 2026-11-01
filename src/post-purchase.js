@@ -63,7 +63,16 @@ export function apkInstallationGuide(order = {}) {
 
 export function goldCompletionGuide(order = {}) {
   if (order.gold_revoked_at || order.platform !== "iOS" || !["paid", "completed"].includes(order.status)) return "";
-  const completed = order.status === "completed";
+  const ultra = order.plan_id === "ios-ultra-lifetime";
+  let dnsUrl = "/tai-dns/";
+  if (ultra) {
+    dnsUrl = "";
+    try {
+      const url = new URL(order.ultra_install_url);
+      if (["http:", "https:"].includes(url.protocol) && !url.username && !url.password) dnsUrl = url.href;
+    } catch {}
+  }
+  const completed = order.status === "completed" && Boolean(dnsUrl);
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", '"': "&quot;", "'": "&#39;", ">": "&gt;" }[char]));
   return `<section class="gold-success" aria-labelledby="gold-complete-title">
     <div class="gold-success-check" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none"><path d="m13 24 8 8 15-17" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
@@ -71,7 +80,7 @@ export function goldCompletionGuide(order = {}) {
     <h2 id="gold-complete-title">Thanh Toán Thành Công! <span aria-hidden="true">🎉</span></h2>
     <div class="gold-success-account"><span>Tài khoản: <b>@${esc(order.username)}</b></span><span>Gói: <b>${esc(order.plan_name)}</b></span></div>
     ${completed ? `<p class="gold-success-description">Tài khoản đã được hệ thống kích hoạt quyền sở hữu<br><strong>✦ LOCKET GOLD ✦</strong></p>
-    <a class="gold-success-dns" data-gold-dns href="/tai-dns/"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Cài Đặt DNS Ngay (iOS)</a>
+    <a class="gold-success-dns" ${ultra ? 'data-ultra-dns referrerpolicy="no-referrer"' : "data-gold-dns"} href="${esc(dnsUrl)}"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Cài Đặt DNS Ngay (iOS)</a>
     <div class="gold-success-instructions"><h3>ⓘ HƯỚNG DẪN HOÀN TẤT TRÊN IPHONE</h3><ol>
       <li><span>1</span><p>Bấm nút <b>“Cài Đặt DNS Ngay”</b> bên trên (mở bằng Safari) → chọn <b>Cho phép</b> tải về hồ sơ cấu hình.</p></li>
       <li><span>2</span><p>Mở <b>Cài đặt</b> trên iPhone → nhấn <b>Đã tải về hồ sơ</b> → bấm <b>Cài đặt</b>.</p></li>
@@ -83,3 +92,4 @@ export function goldCompletionGuide(order = {}) {
     <p class="gold-success-order">Mã đơn: ${esc(order.code)} · <a href="/lien-he/">Liên hệ hỗ trợ</a></p>
   </section>`;
 }
+

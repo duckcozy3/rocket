@@ -558,7 +558,7 @@ async function checkOrder(code) {
       guide.hidden = false;
       paymentGuideShown = guideType;
       guide.scrollIntoView({ behavior: "smooth", block: "start" });
-      if (guideType === "gold") {
+      if (guideType === "gold" && order.plan_id !== "ios-ultra-lifetime") {
         api("/api/public-config").then((config) => {
           const link = guide.querySelector("[data-gold-dns]");
           if (link && /^https:\/\//i.test(config.dns_url)) link.href = config.dns_url;

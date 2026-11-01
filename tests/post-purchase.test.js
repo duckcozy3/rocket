@@ -38,6 +38,17 @@ test("the APK guide contains all five steps, troubleshooting and direct download
   assert.match(guide, /download="LocketGold.website.apk"/);
 });
 
+test("Ultra reuses the Gold success screen with its personal DNS link", () => {
+  const order = { code: "LGABCDEFGH", username: "alice", plan_name: "Ultra", platform: "iOS", plan_id: "ios-ultra-lifetime", status: "completed", ultra_install_url: "http://103.101.161.228:8081/vip/personal" };
+  const html = goldCompletionGuide(order);
+  assert.match(html, /Thanh Toán Thành Công/);
+  assert.match(html, /Cài Đặt DNS Ngay/);
+  assert.match(html, /href="http:\/\/103\.101\.161\.228:8081\/vip\/personal"/);
+  assert.equal(html.includes("data-gold-dns"), false);
+  assert.equal((html.match(/<li>/g) || []).length, 4);
+  assert.equal(goldCompletionGuide({ ...order, ultra_install_url: "javascript:alert(1)" }).includes("data-ultra-dns"), false);
+});
+
 test("activation requires completion rather than request acceptance", () => {
   for (const response of [null, {}, { success: true }, { status: "pending" }, { status: "processing" }, { success: true, status: "accepted" }, { success: false, status: "completed" }]) {
     assert.equal(activationConfirmed(response), false, JSON.stringify(response));

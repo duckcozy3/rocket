@@ -727,3 +727,9 @@ body:not([data-page="admin"]) :is(.form-card label small, .privacy-line, .bank-b
 @media print {
   body[data-page="home"] .home-reveal { opacity: 1; translate: none; }
 }
+
+.price-card--ultra { grid-column: span 2; border: 2px solid var(--pink-500); background: linear-gradient(135deg, #fff5fa, #fff0f5 55%, #fff8e9); }
+.price-card--ultra .popular-ribbon { background: var(--pink-700); }
+.price-card--ultra ul { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.price-card--ultra li { padding: 12px; border: 1px solid var(--pink-200); border-radius: 12px; background: rgba(255,255,255,.75); }
+@media (max-width: 615px) { .price-card--ultra { grid-column: auto; } .price-card--ultra ul { grid-template-columns: 1fr; } }

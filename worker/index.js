@@ -6,6 +6,7 @@ import { createCtvTopup, readCtvTopup, creditCtvTopup } from "./ctv-topups.js";
 import { ensureCtvCredits, buyCtvCredits } from "./ctv-credit-wallet.js";
 import { DEFAULT_PLANS } from "../src/plans.js";
 import { activationConfirmed } from "./activation.js";
+import { activateUltraOrder } from "./ultra.js";
 import { adminCredential, passwordHash, verifyAdminPassword } from "./admin-account.js";
 import { DEFAULT_WELCOME, validateWelcome } from "../src/welcome-notice.js";
 import { downloadAndroidApk } from "./android-apk.js";
@@ -294,7 +295,7 @@ async function getOrder(env, code) {
   requireDb(env);
   if (!/^LG[A-Z0-9]{8}$/.test(code)) throw httpError(400, "Mã đơn không hợp lệ.");
   await expirePendingOrders(env);
-  const order = await env.DB.prepare("SELECT code, username, plan_name, platform, amount, status, expires_at, expired_at, gold_revoked_at, created_at, paid_at, completed_at FROM orders WHERE code = ?").bind(code).first();
+  const order = await env.DB.prepare("SELECT code, username, plan_id, plan_name, platform, amount, status, expires_at, expired_at, gold_revoked_at, created_at, paid_at, completed_at, ultra_install_url FROM orders WHERE code = ?").bind(code).first();
   if (!order) throw httpError(404, "Không tìm thấy đơn.");
   return json({ ...order, ...transferDetails(env, code) });
 }
@@ -379,6 +380,7 @@ export async function repairQueuedGoldExpiries(env) {
 }
 
 async function activateOrder(env, order) {
+  if (order.plan_id === "ios-ultra-lifetime") return activateUltraOrder(env, order);
   if (order.platform === "Spotify") return activateSpotifyOrder(env, order);
   if (env.NODNS_API_KEY) {
     const body = grantPayload(order);

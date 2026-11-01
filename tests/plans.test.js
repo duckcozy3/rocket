@@ -10,7 +10,7 @@ test("the public API and quotes keep the prices initially displayed by the front
   assert.equal(response.status, 200);
   const { plans } = await response.json();
   assert.deepEqual(plans, DEFAULT_PLANS);
-  assert.deepEqual(plans.map(({ price }) => price), [29000, 69000, 139000, 99000]);
+  assert.deepEqual(plans.map(({ price }) => price), [29000, 69000, 139000, 199000, 99000]);
 
   for (const plan of plans) {
     const quote = await worker.fetch(new Request(`${site}/api/quote`, {

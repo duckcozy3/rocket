@@ -87,11 +87,11 @@ export function createPageRenderer(page, search = "") {
   }
 
   function planCards(plans = fallbackPlans) {
-    return `<div class="pricing-grid pricing-grid--four">${plans.map((plan) => `<article class="price-card ${plan.featured ? "price-card--featured" : ""}">
-      ${plan.featured ? '<span class="popular-ribbon">Khuyên dùng</span>' : ""}
+    return `<div class="pricing-grid pricing-grid--four">${plans.map((plan) => `<article class="price-card ${plan.id === "ios-ultra-lifetime" ? "price-card--ultra" : plan.featured ? "price-card--featured" : ""}">
+      ${plan.id === "ios-ultra-lifetime" ? '<span class="popular-ribbon">Filter AI + Gold</span>' : plan.featured ? '<span class="popular-ribbon">Khuyên dùng</span>' : ""}
       <span class="plan-platform">${escapeHtml(plan.platform)}</span><h2>${escapeHtml(plan.name)}</h2>
       <p class="price">${Number(plan.old_price) > Number(plan.price) ? `<del>${money(plan.old_price)}</del>` : ""}<strong>${money(plan.price)}</strong><span>/ ${escapeHtml(plan.period)}</span></p>
-      ${String(plan.platform).toLowerCase() === "ios" ? `<ul><li>✓ Mở khóa Locket Gold</li><li>✓ Không quảng cáo</li><li>✓ Upload ảnh từ thư viện</li><li>✓ Quay video Lockets 60s</li><li>✓ Xem những ai đã xem Lockets của bạn</li><li>✓ Thay đổi icon Locket</li><li>✓ Mở khóa giới hạn bạn bè</li><li>✓ Huy hiệu Locket Gold</li></ul>` : `<ul><li>✓ Bản cài đặt riêng cho điện thoại Android</li><li>✓ Mở khóa full tính năng Locket Gold cao cấp</li><li>✓ Kỹ thuật viên Admin hỗ trợ cài đặt 1-1</li><li>✓ Bảo hành uy tín, hỗ trợ 24/7</li><li>✓ Kích hoạt nhanh chóng qua Zalo / Telegram</li></ul>`}
+      ${plan.id === "ios-ultra-lifetime" ? `<ul><li>✦ 49+ bộ lọc camera AI, filter gốc &amp; hot trend</li><li>✦ AI img2img giữ đường nét khuôn mặt</li><li>✦ Hiệu ứng tuyết rơi &amp; watermark Locket</li><li>✦ Cấu hình DNS VIP riêng từ VPS</li><li>✦ Bao gồm Gold: video 60 giây &amp; Live Photo</li><li>✦ Đổi icon, gỡ quảng cáo &amp; cứu chuỗi Streak</li><li>✦ Sở hữu vĩnh viễn, mua một lần</li><li>✦ Gói độc lập, không nâng cấp từ gói khác</li><li>✦ Kích hoạt tự động sau thanh toán</li></ul>` : String(plan.platform).toLowerCase() === "ios" ? `<ul><li>✓ Mở khóa Locket Gold</li><li>✓ Không quảng cáo</li><li>✓ Upload ảnh từ thư viện</li><li>✓ Quay video Lockets 60s</li><li>✓ Xem những ai đã xem Lockets của bạn</li><li>✓ Thay đổi icon Locket</li><li>✓ Mở khóa giới hạn bạn bè</li><li>✓ Huy hiệu Locket Gold</li></ul>` : `<ul><li>✓ Bản cài đặt riêng cho điện thoại Android</li><li>✓ Mở khóa full tính năng Locket Gold cao cấp</li><li>✓ Kỹ thuật viên Admin hỗ trợ cài đặt 1-1</li><li>✓ Bảo hành uy tín, hỗ trợ 24/7</li><li>✓ Kích hoạt nhanh chóng qua Zalo / Telegram</li></ul>`}
       <a class="button ${plan.featured ? "" : "button--outline"}" href="/thanh-toan/?plan=${encodeURIComponent(plan.id)}">Chọn gói này</a>
     </article>`).join("")}</div>`;
   }
