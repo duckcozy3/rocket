@@ -228,3 +228,5 @@
 .ctvp-password label { display: grid; gap: 10px; margin: 22px 0; color: #c5b6d8; font-weight: 600; }
 .ctvp-password input { width: 100%; min-height: 50px; padding: 14px 16px; border: 1px solid #393044; border-radius: 14px; background: #211c2c; color: #f5edff; font: inherit; }
 .ctvp-password input:focus-visible { outline: 2px solid #b67cff; outline-offset: 3px; }
+
+.ctvp-packages { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -865,7 +865,7 @@ async function ctvMe(request, env) {
 async function ctvOrders(request, env) {
   requireDb(env);
   const session = await requireSession(request, env, "ctv");
-  const { results } = await env.DB.prepare("SELECT code, username, plan_name, amount, status, created_at FROM orders WHERE ctv_id = ? ORDER BY created_at DESC LIMIT 50").bind(Number(session.sub)).all();
+  const { results } = await env.DB.prepare("SELECT code, username, plan_id, plan_name, amount, status, created_at, ultra_install_url FROM orders WHERE ctv_id = ? ORDER BY created_at DESC LIMIT 50").bind(Number(session.sub)).all();
   return json({ orders: results || [] });
 }
 
@@ -892,7 +892,13 @@ async function ctvCreateOrder(request, env, ctx) {
   const debit = env.DB.prepare("UPDATE ctv_credits SET credits = credits - ? WHERE ctv_id = ? AND EXISTS (SELECT 1 FROM orders WHERE code = ? AND ctv_id = ?)").bind(requiredCredits, user.id, code, user.id);
   const results = await env.DB.batch([insert, debit]);
   if (!results[0].meta?.changes) throw httpError(409, "Số lượt vừa thay đổi, vui lòng thử lại.");
-  ctx.waitUntil(activateOrder(env, { code, username, plan_id: plan.id, platform: plan.platform }));
+  const activation = activateOrder(env, { code, username, plan_id: plan.id, platform: plan.platform });
+  if (plan.id === "ios-ultra-lifetime") {
+    await activation;
+    const order = await env.DB.prepare("SELECT ultra_install_url FROM orders WHERE code = ? AND ctv_id = ?").bind(code, user.id).first();
+    return json({ message: order?.ultra_install_url ? "Đã kích hoạt Ultra. Link DNS riêng có trong danh sách đơn." : "Đã tạo đơn Ultra. Vui lòng làm mới danh sách đơn để nhận link DNS riêng.", code, ultra_install_url: order?.ultra_install_url || null }, 201);
+  }
+  ctx.waitUntil(activation);
   return json({ message: "Đã tạo đơn CTV.", code }, 201);
 }
 

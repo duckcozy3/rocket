@@ -136,6 +136,20 @@ test("local CTV management creates protected accounts, sets individual prices, d
     assert.equal(sqlite.prepare("SELECT amount FROM orders ORDER BY id DESC LIMIT 1").get().amount, 0);
     assert.equal(sqlite.prepare("SELECT amount FROM orders ORDER BY id LIMIT 1").get().amount, 15000);
     assert.equal((await call("/api/admin/ctv/prices", admin, { id: 999, prices: {} })).status, 404);
+    env.NODNS_API_KEY = "test-ultra-key";
+    const dns = "https://dns.example/vip/customer-ultra";
+    t.mock.method(globalThis, "fetch", async (url, options) => {
+      assert.equal(url, "https://ctv.nodns.vn/api/v1/ctv/gold");
+      assert.deepEqual(JSON.parse(options.body), { user: "ultracustomer", isFilter: true, package: "filter_lifetime" });
+      return Response.json({ status: "success", data: { active: true, isFilter: true, package: "filter_lifetime", mobileconfigUrl: dns } });
+    });
+    const ultra = await call("/api/ctv/orders", ctv, { username: "ultracustomer", plan_id: "ios-ultra-lifetime", credits: 0 });
+    assert.equal(ultra.status, 201);
+    assert.equal((await ultra.json()).ultra_install_url, dns);
+    assert.equal((await (await call("/api/ctv/me", ctv)).json()).user.available_credits, 102);
+    const history = (await (await call("/api/ctv/orders", ctv)).json()).orders;
+    assert.equal(history.find(order => order.username === "ultracustomer").ultra_install_url, dns);
+    assert.equal(history.find(order => order.username === "ultracustomer").status, "completed");
     const logout = await call("/api/ctv/logout", ctv, {});
     assert.equal(logout.status, 200);
     assert.match(logout.headers.get("Set-Cookie"), /lg_ctv=;.*Max-Age=0/);
@@ -156,8 +170,8 @@ test("local CTV management creates protected accounts, sets individual prices, d
     assert.equal((await call("/api/ctv/credits/buy", ctv, { quantity: 10, request_id: "deleted-user-purchase-001" })).status, 401);
     assert.equal((await call("/api/ctv/login", "", { username: "alice", password: alice.password })).status, 401);
     assert.equal(sqlite.prepare("SELECT balance FROM ctv_users WHERE id = ?").get(aliceId).balance, 160000);
-    assert.equal(sqlite.prepare("SELECT credits FROM ctv_credits WHERE ctv_id = ?").get(aliceId).credits, 105);
-    assert.equal(sqlite.prepare("SELECT COUNT(*) count FROM orders WHERE ctv_id = ?").get(aliceId).count, 4);
+    assert.equal(sqlite.prepare("SELECT credits FROM ctv_credits WHERE ctv_id = ?").get(aliceId).credits, 102);
+    assert.equal(sqlite.prepare("SELECT COUNT(*) count FROM orders WHERE ctv_id = ?").get(aliceId).count, 5);
     const recreated = { username: "ALICE", password: "new-account-password", initial_balance: 20000, unit_price: 1000 };
     assert.equal((await call("/api/admin/ctv", admin, recreated)).status, 201);
     assert.equal((await call("/api/admin/ctv", admin, recreated)).status, 409);
@@ -184,6 +198,6 @@ test("local CTV management creates protected accounts, sets individual prices, d
     assert.equal((await call("/api/ctv/login", "", { username: "alice", password: recreated.password })).status, 401);
     assert.equal((await call("/api/ctv/login", "", { username: "alice", password: passwordChange.new_password })).status, 200);
     assert.equal(sqlite.prepare("SELECT balance FROM ctv_users WHERE id = ?").get(aliceId).balance, 160000);
-    assert.equal(sqlite.prepare("SELECT COUNT(*) count FROM orders WHERE ctv_id = ?").get(aliceId).count, 4);
+    assert.equal(sqlite.prepare("SELECT COUNT(*) count FROM orders WHERE ctv_id = ?").get(aliceId).count, 5);
   } finally { sqlite.close(); }
 });

@@ -117,6 +117,12 @@ function paymentDb() {
             state.transactionIds.add(id);
             return { meta: { changes: 1 } };
           }
+          if (sql.startsWith("UPDATE orders SET ultra_install_url")) {
+            if (state.order.status !== "paid") return { meta: { changes: 0 } };
+            state.order.ultra_install_url = this.values[0];
+            state.order.status = "completed";
+            return { meta: { changes: 1 } };
+          }
           if (sql.startsWith("UPDATE orders SET status = 'completed'")) {
             if (state.order.status !== "paid") return { meta: { changes: 0 } };
             state.order.status = "completed";
@@ -234,4 +240,28 @@ test("finite grants repair a lifetime response and stay paid until the expiry is
     assert.equal(calls.length, 2);
     mock.mock.restore();
   }
+});
+
+test("Ultra payment activates VIP and saves the personal DNS without activating twice", async (t) => {
+  const db = paymentDb();
+  db.state.order.plan_id = "ios-ultra-lifetime";
+  const tasks = [];
+  let calls = 0;
+  const link = "https://dns.example/vip/customer";
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    calls++;
+    assert.equal(url, "https://ctv.nodns.vn/api/v1/ctv/gold");
+    assert.equal(options.headers["x-api-key"], "shared-gold-secret");
+    assert.deepEqual(JSON.parse(options.body), { user: "alice", isFilter: true, package: "filter_lifetime" });
+    return Response.json({ status: "success", filterToken: "customer", filterShortUrl: link });
+  });
+  const env = { DB: db, SEPAY_WEBHOOK_API_KEY: "test-secret", NODNS_API_KEY: "shared-gold-secret" };
+  for (const id of ["ultra-payment", "ultra-payment", "ultra-payment-duplicate"]) {
+    const response = await worker.fetch(webhookRequest(id), env, { waitUntil(task) { tasks.push(task); } });
+    assert.equal(response.status, 200);
+    await Promise.all(tasks);
+  }
+  assert.equal(db.state.order.status, "completed");
+  assert.equal(db.state.order.ultra_install_url, link);
+  assert.equal(calls, 1);
 });

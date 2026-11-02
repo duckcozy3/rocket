@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ctvPortalMarkup, ctvProfileMarkup } from "../src/ctv-portal.js";
+import { ctvPortalMarkup, ctvProfileMarkup, ctvUltraDnsMarkup } from "../src/ctv-portal.js";
 import { createPageRenderer } from "../src/page-render.js";
 import { DEFAULT_PLANS } from "../src/plans.js";
 import { remoteLogin, portalOrders } from "../worker/nodns.js";
@@ -61,4 +61,17 @@ test("CTV profile shows the NoDNS avatar, name, username, UID and Gold status sa
 test("remote order mapping preserves available timestamps", () => {
   const [order] = portalOrders({ data: { orders: [{ id: "1", username: "alice", createdAt: "2026-10-15T11:00:00Z" }] } });
   assert.equal(order.created_at, "2026-10-15T11:00:00Z");
+});
+
+test("Ultra costs three credits and exposes only the completed personal DNS URL", async () => {
+  const { ctvCredits } = await import("../src/ctv-pricing.js");
+  const { escapeHtml, money } = createPageRenderer("ctv");
+  assert.equal(ctvCredits("ios-ultra-lifetime"), 3);
+  const markup = ctvPortalMarkup({ username: "ctv" }, false, { escapeHtml, money, plans: DEFAULT_PLANS });
+  assert.ok(markup.includes('value="ios-ultra-lifetime"'));
+  assert.ok(markup.includes('3 lượt'));
+  const order = { plan_id: "ios-ultra-lifetime", status: "completed", ultra_install_url: "https://dns.example/private?a=1&b=2" };
+  assert.ok(ctvUltraDnsMarkup(order, escapeHtml).includes('https://dns.example/private?a=1&amp;b=2'));
+  assert.equal(ctvUltraDnsMarkup({ ...order, status: "paid" }, escapeHtml), "");
+  assert.equal(ctvUltraDnsMarkup({ ...order, ultra_install_url: "javascript:alert(1)" }, escapeHtml), "");
 });
