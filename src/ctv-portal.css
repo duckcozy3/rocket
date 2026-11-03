@@ -92,6 +92,10 @@
 .ctvp-order:nth-child(even) { background: #171422; }
 .ctvp-avatar { display: grid; place-items: center; height: 40px; width: 40px; flex: 0 0 40px; border-radius: 15px; font-weight: 800; color: white; background: #3d2c20; }
 .ctvp-avatar.is-complete { background: #0c3d35; }
+.ctvp-dns-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: 45%; }
+.ctvp-dns-status { width: 100%; font-size: 11px; color: #bfa1dd; overflow-wrap: anywhere; }
+.ctvp-dns-status:empty { display: none; }
+@media (max-width: 700px) { .ctvp-order:has(.ctvp-dns-actions) { flex-wrap: wrap; } .ctvp-dns-actions { max-width: 100%; width: 100%; justify-content: flex-start; } }
 .ctvp-order-info { min-width: 0; flex: 1; }
 .ctvp-order-info > div { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
 .ctvp-order-info strong { color: #fff; overflow-wrap: anywhere; }

@@ -43,7 +43,7 @@ export function ctvUltraDnsMarkup(order, esc) {
   try {
     const url = new URL(order.ultra_install_url);
     if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) return "";
-    return '<a class="ctvp-manage" data-ctv-ultra-dns href="' + esc(url.href) + '" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">DNS riêng Ultra ↗</a>';
+    return '<div class="ctvp-dns-actions"><a class="ctvp-manage" data-ctv-ultra-dns href="' + esc(url.href) + '" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">DNS riêng Ultra ↗</a><button type="button" class="ctvp-manage" data-ctv-copy-dns>Sao chép link DNS</button><span class="ctvp-dns-status" role="status"></span></div>';
   } catch { return ""; }
 }
 
@@ -89,6 +89,20 @@ export async function mountCtvPortal(root, user, remote, helpers) {
     } catch (error) { root.querySelector("#ctv-orders").innerHTML = `<p class="ctvp-empty">${esc(error.message)}</p>`; }
     finally { refreshing = false; button.disabled = false; }
   };
+  root.querySelector("#ctv-orders").addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-ctv-copy-dns]");
+    if (!button) return;
+    const actions = button.closest(".ctvp-dns-actions");
+    const link = actions.querySelector("[data-ctv-ultra-dns]");
+    const status = actions.querySelector(".ctvp-dns-status");
+    button.disabled = true;
+    try {
+      await navigator.clipboard.writeText(link.href);
+      status.textContent = "Đã sao chép link DNS.";
+    } catch {
+      status.textContent = `Không thể sao chép tự động. Sao chép link này: ${link.href}`;
+    } finally { button.disabled = false; }
+  });
   root.querySelector("#ctvp-refresh").addEventListener("click", refresh);
   root.querySelector("#ctvp-search").addEventListener("input", drawOrders);
   root.querySelector("#ctv-logout").addEventListener("click", async () => { try { await api("/api/ctv/logout", { method: "POST" }); location.reload(); } catch (error) { showMessage(error.message, true); } });
