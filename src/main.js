@@ -32,6 +32,7 @@ import { addAdminWelcome } from "./admin-welcome.js";
 import { addAdminPromos } from "./admin-promos.js";
 import { welcomeMarkup, shouldShowWelcome } from "./welcome-notice.js";
 import { orderStatusLabel, goldStatusLabel, planNameLabel } from "./vietnamese.js";
+import "./motion.css";
 
 const page = document.body.dataset.page || "home";
 const app = document.querySelector("#app");
@@ -39,6 +40,9 @@ const { render, defaultDnsUrl, money, escapeHtml, brand, planCards, checkoutPlan
 
 if (!app.hasChildNodes()) app.innerHTML = render();
 const siteLoading = initSiteLoader(page);
+if (!["admin", "ctv"].includes(page)) {
+  Promise.resolve(siteLoading).then(() => document.body.classList.add("motion-ready"));
+}
 document.querySelector("#current-year")?.replaceChildren(String(new Date().getFullYear()));
 
 function initNavigation() {
@@ -905,7 +909,7 @@ initFeedbackGallery();
 initGuide();
 const refreshHomeReveal = initHomeReveal();
 loadPlans().then(refreshHomeReveal);
-loadPosts();
+loadPosts().then(refreshHomeReveal);
 loadDownloads();
 initWelcomeModal();
 initCheckout();

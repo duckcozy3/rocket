@@ -1,0 +1,91 @@
+﻿/* Motion uses opacity and transforms so it never moves surrounding content. */
+:root { --motion-ease: cubic-bezier(.22, 1, .36, 1); }
+@media (prefers-reduced-motion: no-preference) {
+  .home-reveal {
+    transition: opacity 600ms var(--motion-ease) var(--reveal-delay, 0ms),
+      translate 600ms var(--motion-ease) var(--reveal-delay, 0ms),
+      transform 280ms var(--motion-ease), box-shadow 280ms ease, border-color 280ms ease;
+  }
+  .home-reveal--pending { opacity: 0; translate: 0 22px; }
+  .motion-ready :is(.hero-copy > *, .page-hero .container > *) {
+    animation: content-arrive 700ms var(--motion-ease) both;
+  }
+  .motion-ready :is(.hero-copy, .page-hero .container) > :nth-child(2) { animation-delay: 70ms; }
+  .motion-ready :is(.hero-copy, .page-hero .container) > :nth-child(3) { animation-delay: 140ms; }
+  .motion-ready :is(.hero-copy, .page-hero .container) > :nth-child(n+4) { animation-delay: 210ms; }
+  .motion-ready .hero-art { animation: content-arrive 900ms var(--motion-ease) 120ms both; }
+  .motion-ready .float-chip { animation: gentle-float 5s ease-in-out 1s 2; }
+  .motion-ready .float-chip--bottom { animation-delay: 1.8s; }
+  .button { transition: transform 260ms var(--motion-ease), box-shadow 260ms ease, opacity 180ms ease; }
+  .button:not(:disabled):active { transform: translateY(0) scale(.97); box-shadow: 0 4px 12px #b72c6226; }
+  :is(.price-card, .post-card, .image-benefit, .contact-grid > *) {
+    transition: opacity 600ms var(--motion-ease) var(--reveal-delay, 0ms), translate 600ms var(--motion-ease) var(--reveal-delay, 0ms), transform 280ms var(--motion-ease), box-shadow 280ms ease, border-color 280ms ease;
+  }
+  .post-card-image img { transition: transform 500ms var(--motion-ease); }
+  :is(input, select, textarea) { transition: border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease; }
+  .menu-toggle span { transition: transform 280ms var(--motion-ease), opacity 180ms ease; }
+  .menu-toggle[aria-expanded="true"] span:first-child { transform: translateY(6px) rotate(45deg); }
+  .menu-toggle[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
+  .menu-toggle[aria-expanded="true"] span:last-child { transform: translateY(-6px) rotate(-45deg); }
+  :is(.welcome-modal, .feedback-viewer)[open] { animation: dialog-arrive 320ms var(--motion-ease) both; }
+  :is(.welcome-modal, .feedback-viewer)[open]::backdrop { animation: backdrop-arrive 240ms ease both; }
+  .guide-slide:not([hidden]) { animation: content-arrive 380ms var(--motion-ease) both; }
+  .activity-toast:not([hidden]) { animation: content-arrive 400ms var(--motion-ease) both; }
+  @media (hover: hover) and (pointer: fine) {
+    :is(.price-card, .post-card, .image-benefit, .contact-grid > *):hover {
+      translate: 0 -5px;
+      box-shadow: 0 20px 42px #782a4b1a;
+      border-color: var(--pink-300);
+    }
+    .home-reveal--pending:hover { translate: 0 22px; }
+    .post-card:hover .post-card-image img { transform: scale(1.035); }
+  }
+  @media (max-width: 1100px) {
+    .main-nav { transition: transform 380ms var(--motion-ease), opacity 280ms ease, visibility 380ms; }
+    .nav-backdrop:not([hidden]) { animation: backdrop-arrive 280ms ease both; }
+  }
+}
+@keyframes content-arrive { from { opacity: 0; translate: 0 18px; } to { opacity: 1; translate: 0 0; } }
+@keyframes dialog-arrive { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes backdrop-arrive { from { opacity: 0; } to { opacity: 1; } }
+@keyframes gentle-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -6px; } }
+@media print { .home-reveal { opacity: 1 !important; translate: none !important; } }
+
+/* Hello Kitty companion: reuse the site's lightweight vector artwork. */
+.kitty-companion { position: absolute; z-index: 3; right: 8px; bottom: -25px; width: clamp(76px, 10vw, 128px); aspect-ratio: 160 / 150; pointer-events: none; }
+.hero-art .kitty-companion-character { width: 100%; height: auto; max-height: none; aspect-ratio: 160 / 150; border-radius: 0; filter: drop-shadow(0 7px 7px #b9477526); transform-origin: 50% 85%; }
+.kitty-companion-heart, .kitty-companion-sparkle { position: absolute; color: var(--pink-600); font-size: 23px; line-height: 1; }
+.kitty-companion-heart--one { top: 10%; left: -4%; rotate: -18deg; }
+.kitty-companion-heart--two { top: -4%; right: 6%; color: var(--pink-500); font-size: 28px; rotate: 12deg; }
+.kitty-companion-sparkle { top: 42%; right: -4%; color: #c78a24; }
+@media (prefers-reduced-motion: no-preference) {
+  .motion-ready .kitty-companion-character { animation: kitty-hello 3.6s ease-in-out 650ms 3; }
+  .motion-ready .kitty-companion-heart { animation: kitty-heart-rise 3.6s var(--motion-ease) 850ms 3 both; }
+  .motion-ready .kitty-companion-heart--two { animation-delay: 1.5s; }
+  .motion-ready .kitty-companion-sparkle { animation: kitty-twinkle 2.4s ease-in-out 1s 4; }
+  .motion-ready .hero-bow { transform-origin: 50% 55%; animation: kitty-bow-sway 4s ease-in-out 800ms 3; }
+  .motion-ready .hero-bow--title { animation-delay: 1.4s; }
+  .motion-ready .hero-heart { animation: kitty-heart-bob 4s ease-in-out 1s 3; }
+  .motion-ready .hero-heart--two { animation-delay: 1.7s; }
+  .motion-ready .hero-heart--three { animation-delay: 2.3s; }
+  @media (hover: hover) and (pointer: fine) {
+    .hero-art:hover .kitty-companion-character { animation: kitty-hello 1.4s ease-in-out infinite; }
+    .hero-actions .button:hover .hero-bow { animation: kitty-bow-sway 900ms ease-in-out infinite; }
+  }
+}
+@keyframes kitty-hello {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  25% { transform: translateY(-7px) rotate(-7deg); }
+  55% { transform: translateY(-3px) rotate(6deg); }
+  75% { transform: translateY(-6px) rotate(-3deg); }
+}
+@keyframes kitty-heart-rise {
+  0% { opacity: 0; translate: 0 8px; scale: .75; }
+  25%, 55% { opacity: .85; }
+  100% { opacity: 0; translate: 3px -26px; scale: 1.1; }
+}
+@keyframes kitty-twinkle { 0%, 100% { opacity: .35; scale: .8; rotate: 0deg; } 50% { opacity: 1; scale: 1.15; rotate: 20deg; } }
+@keyframes kitty-bow-sway { 0%, 100% { rotate: 0deg; } 30% { rotate: -9deg; } 65% { rotate: 7deg; } }
+@keyframes kitty-heart-bob { 0%, 100% { translate: 0 0; scale: 1; } 50% { translate: 0 -5px; scale: 1.08; } }
+@media (max-width: 640px) { .kitty-companion { right: 8px; bottom: -20px; width: 82px; } .kitty-companion-heart { font-size: 18px; } .kitty-companion-heart--two { font-size: 22px; } }
+@media print { .kitty-companion { display: none; } }

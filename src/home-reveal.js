@@ -1,8 +1,8 @@
-// Enhance only the home page; content stays visible when motion is disabled.
+﻿// Progressive enhancement: content remains readable without JavaScript or motion.
 export function initHomeReveal() {
-  const root = document.querySelector('body[data-page="home"] main');
+  const root = document.querySelector('main');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-  if (!root || reducedMotion.matches || !('IntersectionObserver' in window)) return () => {};
+  if (!root || ['admin', 'ctv'].includes(document.body.dataset.page) || reducedMotion.matches || !('IntersectionObserver' in window)) return () => {};
 
   const seen = new WeakSet();
   const pending = new Set();
@@ -19,13 +19,14 @@ export function initHomeReveal() {
 
   const refresh = () => {
     if (reducedMotion.matches) return;
-    root.querySelectorAll('.feature-strip .container > span, .section-heading, .image-benefit, .price-card, .two-col > div, .step-list > li, .post-card, .section .center').forEach((element) => {
-      if (seen.has(element)) return;
+    root.querySelectorAll('.feature-strip .container > span, .section-heading, .image-benefit, .price-card, .two-col > div, .step-list > li, .post-card, .section .center, .trust-grid > *, .metric-grid > *, .contact-grid > *, .guide-extra > *, .pricing-video').forEach((element) => {
+      if (seen.has(element) || element.closest('[hidden]')) return;
+      // Avoid nesting reveal animations inside another animated container.
+      if (element.parentElement.closest('.home-reveal')) return;
       seen.add(element);
-      // Keep the initial viewport and restored scroll position immediately readable.
       if (element.getBoundingClientRect().top < window.innerHeight) return;
       const index = [...element.parentElement.children].indexOf(element);
-      element.style.setProperty('--reveal-delay', Math.min(index, 3) * 65 + 'ms');
+      element.style.setProperty('--reveal-delay', Math.min(index, 3) * 60 + 'ms');
       element.classList.add('home-reveal', 'home-reveal--pending');
       pending.add(element);
       observer.observe(element);
