@@ -1,3 +1,4 @@
+import { promoPlanTypes, assertPromoPlan } from "../src/promo-plans.js";
 import { extractPaymentCodes, paymentCodeRules } from "../src/payment-codes.js";
 import { normalizeUsername } from "../src/username.js";
 import { adminRevenue } from "./admin-revenue.js";
@@ -257,6 +258,7 @@ async function quoteOrder(request, env) {
   const promoCode = cleanText(body.promo_code, 32);
   const promo = promoCode ? await findPromo(env, promoCode) : null;
   if (promoCode && !promo) throw httpError(400, "Mã giảm giá không hợp lệ hoặc đã hết hạn.");
+  assertPromoPlan(promo, plan);
   const discountAmount = promo ? Math.floor(Number(plan.price) * Number(promo.percent) / 100) : 0;
   return json({ subtotal: Number(plan.price), discount_percent: Number(promo?.percent || 0), discount_amount: discountAmount, total: Number(plan.price) - discountAmount });
 }
@@ -272,6 +274,7 @@ async function createOrder(request, env) {
   if (!plan) throw httpError(400, "Gói đã chọn không tồn tại.");
   const promo = body.promo_code ? await findPromo(env, body.promo_code) : null;
   if (body.promo_code && !promo) throw httpError(400, "Mã giảm giá không hợp lệ hoặc đã hết hạn.");
+  assertPromoPlan(promo, plan);
   const discount = promo ? Math.floor(Number(plan.price) * Number(promo.percent) / 100) : 0;
   const amount = Number(plan.price) - discount;
   const code = `LG${randomCode(8)}`;
@@ -651,7 +654,7 @@ async function adminCreatePromo(request, env) {
   const expiry = body.expires_at ? new Date(body.expires_at) : null;
   if (expiry && !Number.isFinite(expiry.getTime())) throw httpError(400, "Ngày hết hạn không hợp lệ.");
   const expiresAt = expiry ? expiry.toISOString() : null;
-  await env.DB.prepare("INSERT INTO promo_codes (code, percent, expires_at, active) VALUES (?, ?, ?, 1) ON CONFLICT(code) DO UPDATE SET percent = excluded.percent, expires_at = excluded.expires_at, active = 1").bind(code, percent, expiresAt).run();
+  await env.DB.prepare("INSERT INTO promo_codes (code, percent, expires_at, plan_types, active) VALUES (?, ?, ?, ?, 1) ON CONFLICT(code) DO UPDATE SET percent = excluded.percent, expires_at = excluded.expires_at, plan_types = excluded.plan_types, active = 1").bind(code, percent, expiresAt, JSON.stringify(promoPlanTypes(body.plan_types))).run();
   return json({ message: "Đã lưu mã giảm giá." });
 }
 
@@ -663,7 +666,7 @@ export function promoStatus(promo, now = Date.now()) {
 
 async function adminListPromos(request, env) {
   await requireSession(request, env, "admin"); requireDb(env);
-  const { results } = await env.DB.prepare("SELECT p.code, p.percent, p.active, p.expires_at, p.created_at, COALESCE(u.paid_orders, 0) AS paid_orders, COALESCE(u.discount_total, 0) AS discount_total FROM promo_codes p LEFT JOIN (SELECT promo_code, COUNT(*) AS paid_orders, SUM(discount_amount) AS discount_total FROM orders WHERE status IN ('paid', 'completed') AND platform <> 'Spotify' GROUP BY promo_code) u ON u.promo_code = p.code ORDER BY p.created_at DESC, p.code ASC").all();
+  const { results } = await env.DB.prepare("SELECT p.code, p.percent, p.plan_types, p.active, p.expires_at, p.created_at, COALESCE(u.paid_orders, 0) AS paid_orders, COALESCE(u.discount_total, 0) AS discount_total FROM promo_codes p LEFT JOIN (SELECT promo_code, COUNT(*) AS paid_orders, SUM(discount_amount) AS discount_total FROM orders WHERE status IN ('paid', 'completed') AND platform <> 'Spotify' GROUP BY promo_code) u ON u.promo_code = p.code ORDER BY p.created_at DESC, p.code ASC").all();
   const promos = (results || []).map(row => ({ ...row, status: promoStatus(row) }));
   return json({ promos, summary: { total: promos.length, active: promos.filter(p => p.status === "active").length, expired: promos.filter(p => p.status === "expired").length, cancelled: promos.filter(p => p.status === "cancelled").length } });
 }
@@ -925,7 +928,7 @@ async function findPromo(env, code) {
   if (!env.DB) return null;
   const normalized = cleanText(code, 32).toUpperCase();
   if (!normalized) return null;
-  return env.DB.prepare("SELECT code, percent FROM promo_codes WHERE code = ? AND active = 1 AND (expires_at IS NULL OR datetime(expires_at) > datetime('now'))").bind(normalized).first();
+  return env.DB.prepare("SELECT code, percent, plan_types FROM promo_codes WHERE code = ? AND active = 1 AND (expires_at IS NULL OR datetime(expires_at) > datetime('now'))").bind(normalized).first();
 }
 
 async function readSettings(env, keys) {

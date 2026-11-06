@@ -1,4 +1,5 @@
 const statuses = { active: "Đang hoạt động", expired: "Đã hết hạn", cancelled: "Đã hủy" };
+import { PROMO_PLAN_TYPES, promoPlanTypes } from "./promo-plans.js";
 export function addAdminPromos(dash, api, { escapeHtml: esc, money, panelId = "promos", endpoint = "/api/admin/promos" }) {
   const panel = dash.querySelector(`#${panelId}`), form = panel.querySelector("form");
   form.removeAttribute("data-admin-endpoint");
@@ -7,6 +8,13 @@ export function addAdminPromos(dash, api, { escapeHtml: esc, money, panelId = "p
   const help = document.createElement("p");
   help.textContent = "Để trống ngày hết hạn nếu mã không giới hạn thời gian. Lưu mã trùng sẽ cập nhật mức giảm và bật lại mã đó.";
   form.before(help);
+  const planOptions = document.createElement("fieldset");
+  planOptions.className = "promo-plan-options";
+  planOptions.innerHTML = `<legend>Gói được áp dụng mã giảm giá</legend><div>${Object.entries(PROMO_PLAN_TYPES).map(([type, label]) => {
+    const unavailable = panelId === "spotify-promos" && type === "lifetime";
+    return `<label><input type="checkbox" name="plan_types" value="${type}" ${unavailable ? "disabled" : "checked"}> ${label}${unavailable ? " (chưa có gói)" : ""}</label>`;
+  }).join("")}</div><small>Chọn ít nhất một loại gói.${panelId === "spotify-promos" ? " Tháng gồm gói 1, 3 và 6 tháng; Năm là gói 12 tháng." : " Vĩnh viễn gồm cả Gold và Ultra."}</small>`;
+  form.querySelector('button[type="submit"]').before(planOptions);
   const list = document.createElement("div");
   list.innerHTML = `<hr><h2>Thống kê mã giảm giá</h2><div class="metric-grid" data-promo-summary></div><button class="button button--outline" type="button" data-promo-refresh>Làm mới danh sách</button><p class="form-message" data-promo-message role="status"></p><div class="form-row"><label>Tìm mã<input type="search" data-promo-search placeholder="Nhập mã giảm giá"></label><label>Trạng thái<select data-promo-filter><option value="">Tất cả</option>${Object.entries(statuses).map(([key,label])=>`<option value="${key}">${label}</option>`).join("")}</select></label></div><div data-promo-table></div>`;
   panel.append(list);
@@ -15,7 +23,7 @@ export function addAdminPromos(dash, api, { escapeHtml: esc, money, panelId = "p
   const render = () => {
     const search = list.querySelector("[data-promo-search]").value.trim().toUpperCase(), status = list.querySelector("[data-promo-filter]").value;
     const shown = rows.filter(row => row.code.includes(search) && (!status || row.status === status));
-    list.querySelector("[data-promo-table]").innerHTML = shown.length ? `<div class="table-wrap"><table><thead><tr><th>Mã</th><th>Mức giảm</th><th>Trạng thái</th><th>Ngày hết hạn (giờ VN)</th><th>Đơn đã thanh toán</th><th>Tổng tiền đã giảm</th><th>Thao tác</th></tr></thead><tbody>${shown.map(row=>`<tr><td><b>${esc(row.code)}</b></td><td>${Number(row.percent)}%</td><td><span class="status status--${row.status === "active" ? "completed" : "cancelled"}">${statuses[row.status] || "Chưa xác định"}</span></td><td>${row.expires_at ? esc(new Date(row.expires_at).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })) : "Không giới hạn"}</td><td>${Number(row.paid_orders)}</td><td>${money(row.discount_total)}</td><td>${Number(row.active) ? `<button class="button button--outline button--small" type="button" data-promo-cancel="${esc(row.code)}">Hủy mã</button>` : "—"}</td></tr>`).join("")}</tbody></table></div>` : "<p>Không có mã giảm giá phù hợp.</p>";
+    list.querySelector("[data-promo-table]").innerHTML = shown.length ? `<div class="table-wrap"><table><thead><tr><th>Mã</th><th>Mức giảm</th><th>Gói áp dụng</th><th>Trạng thái</th><th>Ngày hết hạn (giờ VN)</th><th>Đơn đã thanh toán</th><th>Tổng tiền đã giảm</th><th>Thao tác</th></tr></thead><tbody>${shown.map(row=>`<tr><td><b>${esc(row.code)}</b></td><td>${Number(row.percent)}%</td><td>${promoPlanTypes(row.plan_types).map(type => PROMO_PLAN_TYPES[type]).join(", ")}</td><td><span class="status status--${row.status === "active" ? "completed" : "cancelled"}">${statuses[row.status] || "Chưa xác định"}</span></td><td>${row.expires_at ? esc(new Date(row.expires_at).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })) : "Không giới hạn"}</td><td>${Number(row.paid_orders)}</td><td>${money(row.discount_total)}</td><td>${Number(row.active) ? `<button class="button button--outline button--small" type="button" data-promo-cancel="${esc(row.code)}">Hủy mã</button>` : "—"}</td></tr>`).join("")}</tbody></table></div>` : "<p>Không có mã giảm giá phù hợp.</p>";
   };
   const refresh = async () => {
     if (refreshButton.disabled) return;
@@ -46,7 +54,9 @@ export function addAdminPromos(dash, api, { escapeHtml: esc, money, panelId = "p
     event.preventDefault(); if (save.disabled) return;
     save.disabled = true;
     try {
-      const values = Object.fromEntries(new FormData(form));
+      const formData = new FormData(form);
+      const values = Object.fromEntries(formData);
+      values.plan_types = promoPlanTypes(formData.getAll("plan_types"));
       if (values.expires_at) values.expires_at = new Date(`${values.expires_at}${values.expires_at.length === 16 ? ":00" : ""}+07:00`).toISOString();
       const result = await api(endpoint, { method: "POST", body: JSON.stringify(values) });
       formMessage.textContent = result.message; formMessage.className = "form-message is-success"; form.reset(); await refresh();

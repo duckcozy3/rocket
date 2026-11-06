@@ -126,6 +126,20 @@ test("Spotify lookup, separate admin coupons and paid activation work with the r
   await call("/api/admin/spotify/promos/cancel", "POST", { code: "SP10" }, cookie);
   assert.equal((await call("/api/spotify/quote", "POST", { plan_id: "spotify-1month", promo_code: "SP10" })).status, 400);
   assert.equal((await call("/api/spotify/quote", "POST", null)).status, 400);
+  for (const [endpoint, quoteEndpoint, orderEndpoint, allowed, blocked] of [
+    ["/api/admin/promos", "/api/quote", "/api/orders", "ios-year", "ios-month"],
+    ["/api/admin/spotify/promos", "/api/spotify/quote", "/api/spotify/orders", "spotify-12month", "spotify-3month"],
+  ]) {
+    assert.equal((await call(endpoint, "POST", { code: "YEAR10", percent: 10, plan_types: [] }, cookie)).status, 400);
+    assert.equal((await call(endpoint, "POST", { code: "YEAR10", percent: 10, plan_types: ["year"] }, cookie)).status, 200);
+    assert.equal((await call(quoteEndpoint, "POST", { plan_id: allowed, promo_code: "YEAR10" })).status, 200);
+    assert.equal((await call(quoteEndpoint, "POST", { plan_id: blocked, promo_code: "YEAR10" })).status, 400);
+    const rejected = await call(orderEndpoint, "POST", { uid: "alice", username: "alice", contact: "alice@example.com", plan_id: blocked, promo_code: "YEAR10" });
+    assert.equal(rejected.status, 400);
+    assert.match((await rejected.json()).error, /không áp dụng/);
+    const listed = await (await call(endpoint, "GET", undefined, cookie)).json();
+    assert.deepEqual(JSON.parse(listed.promos.find(p => p.code === "YEAR10").plan_types), ["year"]);
+  }
   await activateSpotifyOrder(env, { platform: "Spotify", status: "pending", plan_id: "spotify-1month", username: "alice" });
   assert.equal(grants, 1);
 });

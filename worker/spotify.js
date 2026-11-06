@@ -1,3 +1,4 @@
+import { promoPlanTypes, assertPromoPlan } from "../src/promo-plans.js";
 import { lookupPublicSpotify } from "./spotify-profile.js";
 import { SPOTIFY_PLANS, spotifyUid } from "../src/spotify.js";
 import { providerRequest, resolveNoDnsEnv, unwrap } from "./nodns.js";
@@ -32,9 +33,10 @@ export async function spotifyQuote(env, body) {
   let promo;
   if (code) {
     dbRequired(env);
-    promo = await env.DB.prepare("SELECT code, percent FROM spotify_promo_codes WHERE code = ? AND active = 1 AND (expires_at IS NULL OR datetime(expires_at) > datetime('now'))").bind(code).first();
+    promo = await env.DB.prepare("SELECT code, percent, plan_types FROM spotify_promo_codes WHERE code = ? AND active = 1 AND (expires_at IS NULL OR datetime(expires_at) > datetime('now'))").bind(code).first();
     if (!promo || !Number.isInteger(Number(promo.percent)) || promo.percent < 1 || promo.percent > 100) throw fail(400, "Mã giảm giá Spotify không hợp lệ hoặc đã hết hạn.");
   }
+  assertPromoPlan(promo, plan);
   const discount = promo ? Math.floor(plan.price * Number(promo.percent) / 100) : 0;
   return { plan, promo_code: promo?.code || null, subtotal: plan.price, discount_amount: discount, discount_percent: Number(promo?.percent || 0), total: plan.price - discount };
 }
@@ -86,7 +88,7 @@ export async function spotifyApi(request, env, ctx, { readJson, transferDetails,
       if (path === "/api/admin/spotify/promos") {
         const percent = Number(body.percent), date = body.expires_at ? new Date(body.expires_at) : null;
         if (!Number.isInteger(percent) || percent < 1 || percent > 100 || (date && (!Number.isFinite(date.getTime()) || date.getTime() <= Date.now()))) throw fail(400, "Kiểm tra phần trăm và ngày hết hạn của mã Spotify.");
-        await env.DB.prepare("INSERT INTO spotify_promo_codes (code, percent, expires_at, active) VALUES (?, ?, ?, 1) ON CONFLICT(code) DO UPDATE SET percent = excluded.percent, expires_at = excluded.expires_at, active = 1").bind(code, percent, date?.toISOString() || null).run();
+        await env.DB.prepare("INSERT INTO spotify_promo_codes (code, percent, expires_at, plan_types, active) VALUES (?, ?, ?, ?, 1) ON CONFLICT(code) DO UPDATE SET percent = excluded.percent, expires_at = excluded.expires_at, plan_types = excluded.plan_types, active = 1").bind(code, percent, date?.toISOString() || null, JSON.stringify(promoPlanTypes(body.plan_types))).run();
         return json({ message: "Đã lưu mã giảm giá Spotify." });
       }
     }
